@@ -42,13 +42,14 @@ services:
 
   # React Frontend
   web:
-    build: ./web
+    build:
+      context: ./web
+      args:
+        VITE_API_URL: ${SERVER_URL:-http://localhost}:${API_PORT:-48550}
     container_name: knosi-web
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-48080}:80"
-    environment:
-      - VITE_API_URL=${SERVER_URL:-http://localhost}:${API_PORT:-48550}
     depends_on:
       - api
 
