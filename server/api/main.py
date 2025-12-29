@@ -231,7 +231,7 @@ async def extract_text_from_pdf_batch(content: bytes, filename: str, page_start:
     base64_pdf = base64.standard_b64encode(batch_pdf).decode("utf-8")
 
     try:
-        print(f"   ⏳ Sending pages {page_start+1}-{page_end} to Claude API...")
+        print(f"   ⏳ Sending pages {page_start+1}-{page_end} to Claude API...", flush=True)
         message = claude_client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=16000,
@@ -256,11 +256,11 @@ async def extract_text_from_pdf_batch(content: bytes, filename: str, page_start:
         )
 
         usage = message.usage
-        print(f"   ✅ Pages {page_start+1}-{page_end}: {usage.input_tokens} input tokens, {usage.output_tokens} output tokens")
+        print(f"   ✅ Pages {page_start+1}-{page_end}: {usage.input_tokens} input tokens, {usage.output_tokens} output tokens", flush=True)
 
         return message.content[0].text
     except anthropic.APITimeoutError as e:
-        print(f"   ❌ Timeout on pages {page_start+1}-{page_end}: {str(e)}")
+        print(f"   ❌ Timeout on pages {page_start+1}-{page_end}: {str(e)}", flush=True)
         raise HTTPException(status_code=504, detail=f"Claude API timeout on pages {page_start+1}-{page_end}")
     except anthropic.BadRequestError as e:
         if "content filtering policy" in str(e):
@@ -290,11 +290,11 @@ async def extract_text_from_pdf(content: bytes, filename: str) -> str:
         # Get page count
         reader = PdfReader(io.BytesIO(content))
         total_pages = len(reader.pages)
-        print(f"📚 PDF has {total_pages} pages")
+        print(f"📚 PDF has {total_pages} pages", flush=True)
 
         # For large PDFs (>5MB) or many pages (>50), process in batches
         if file_size_mb > 5 or total_pages > 50:
-            print(f"📑 Large PDF detected - splitting into batches of 20 pages each")
+            print(f"📑 Large PDF detected - splitting into batches of 20 pages each", flush=True)
 
             BATCH_SIZE = 20
             extracted_parts = []
@@ -302,19 +302,19 @@ async def extract_text_from_pdf(content: bytes, filename: str) -> str:
 
             for batch_num, batch_start in enumerate(range(0, total_pages, BATCH_SIZE), 1):
                 batch_end = min(batch_start + BATCH_SIZE, total_pages)
-                print(f"⚙️  Processing batch {batch_num}/{total_batches} (pages {batch_start+1}-{batch_end})...")
+                print(f"⚙️  Processing batch {batch_num}/{total_batches} (pages {batch_start+1}-{batch_end})...", flush=True)
 
                 batch_text = await extract_text_from_pdf_batch(content, filename, batch_start, batch_end)
                 extracted_parts.append(batch_text)
 
             # Combine all batches
             full_text = "\n\n".join(extracted_parts)
-            print(f"✅ Extraction complete: {len(full_text):,} characters from {total_pages} pages ({total_batches} batches)")
+            print(f"✅ Extraction complete: {len(full_text):,} characters from {total_pages} pages ({total_batches} batches)", flush=True)
             return full_text
 
         else:
             # Small PDF - process in one go
-            print(f"⚙️  Processing all {total_pages} pages in single request...")
+            print(f"⚙️  Processing all {total_pages} pages in single request...", flush=True)
             base64_pdf = base64.standard_b64encode(content).decode("utf-8")
 
             message = claude_client.messages.create(
@@ -452,96 +452,114 @@ async def upload_document(
     _: bool = Depends(verify_api_key)
 ):
     """Upload and index a document."""
-    # Use path if provided (from watcher), otherwise use filename
-    filename = path or file.filename
-    ext = Path(filename).suffix.lower()
+    try:
+        print(f"DEBUG: Upload endpoint called", flush=True)
+        print(f"DEBUG: file.filename={file.filename}, path={path}", flush=True)
 
-    if ext not in SUPPORTED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type: {ext}. Supported: {', '.join(SUPPORTED_EXTENSIONS)}"
+        # Use path if provided (from watcher), otherwise use filename
+        filename = path or file.filename
+        print(f"DEBUG: Using filename={filename}", flush=True)
+
+        ext = Path(filename).suffix.lower()
+        print(f"DEBUG: File extension={ext}", flush=True)
+
+        if ext not in SUPPORTED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {ext}. Supported: {', '.join(SUPPORTED_EXTENSIONS)}"
+            )
+
+        print(f"📤 Upload started: {filename}", flush=True)
+
+        # Read file content
+        print(f"DEBUG: About to read file content", flush=True)
+        content = await file.read()
+        file_size = len(content)
+        file_size_mb = file_size / (1024 * 1024)
+        print(f"📦 File read: {file_size_mb:.1f}MB", flush=True)
+
+        if file_size > MAX_FILE_SIZE_MB * 1024 * 1024:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File too large. Max size: {MAX_FILE_SIZE_MB}MB"
+            )
+
+        # Check if already indexed with same hash
+        print(f"DEBUG: Computing file hash", flush=True)
+        file_hash = compute_file_hash(content)
+        existing = await session.execute(
+            select(Document).where(Document.filename == filename)
         )
+        existing_doc = existing.scalar_one_or_none()
 
-    print(f"📤 Upload started: {filename}")
+        if existing_doc and existing_doc.file_hash == file_hash:
+            return {"message": "Document already indexed", "filename": filename, "status": "unchanged"}
 
-    # Read file content
-    content = await file.read()
-    file_size = len(content)
-    file_size_mb = file_size / (1024 * 1024)
-    print(f"📦 File read: {file_size_mb:.1f}MB")
-    
-    if file_size > MAX_FILE_SIZE_MB * 1024 * 1024:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File too large. Max size: {MAX_FILE_SIZE_MB}MB"
-        )
-    
-    # Check if already indexed with same hash
-    file_hash = compute_file_hash(content)
-    existing = await session.execute(
-        select(Document).where(Document.filename == filename)
-    )
-    existing_doc = existing.scalar_one_or_none()
-    
-    if existing_doc and existing_doc.file_hash == file_hash:
-        return {"message": "Document already indexed", "filename": filename, "status": "unchanged"}
-    
-    # Extract text
-    print(f"📄 Extracting text from {filename}...")
-    text = await extract_text(content, filename)
+        # Extract text
+        print(f"📄 Extracting text from {filename}...", flush=True)
+        text = await extract_text(content, filename)
 
-    if not text.strip():
-        raise HTTPException(status_code=400, detail="Could not extract text from document")
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="Could not extract text from document")
 
-    print(f"✂️  Chunking text ({len(text)} characters)...")
-    # Chunk text
-    chunks = chunk_text(text)
-    print(f"📊 Created {len(chunks)} chunks")
+        print(f"✂️  Chunking text ({len(text)} characters)...", flush=True)
+        # Chunk text
+        chunks = chunk_text(text)
+        print(f"📊 Created {len(chunks)} chunks", flush=True)
 
-    # Generate embeddings
-    print(f"🧠 Generating embeddings for {len(chunks)} chunks...")
-    embeddings = get_embeddings(chunks)
-    print(f"✅ Embeddings complete")
-    
-    # Remove old document if exists
-    if existing_doc:
-        print(f"🔄 Updating existing document...")
-        await session.execute(delete(Chunk).where(Chunk.document_id == existing_doc.id))
-        await session.delete(existing_doc)
-        await session.commit()
+        # Generate embeddings
+        print(f"🧠 Generating embeddings for {len(chunks)} chunks...", flush=True)
+        embeddings = get_embeddings(chunks)
+        print(f"✅ Embeddings complete", flush=True)
 
-    # Create new document (store original file for download)
-    print(f"💾 Saving to database...")
-    doc = Document(
-        filename=filename,
-        file_hash=file_hash,
-        file_size=file_size,
-        file_data=content,  # Store original file
-        chunk_count=len(chunks)
-    )
-    session.add(doc)
-    await session.flush()
+        # Remove old document if exists
+        if existing_doc:
+            print(f"🔄 Updating existing document...", flush=True)
+            await session.execute(delete(Chunk).where(Chunk.document_id == existing_doc.id))
+            await session.delete(existing_doc)
+            await session.commit()
 
-    # Create chunks
-    for i, (chunk_text_content, embedding) in enumerate(zip(chunks, embeddings)):
-        chunk = Chunk(
-            document_id=doc.id,
+        # Create new document (store original file for download)
+        print(f"💾 Saving to database...", flush=True)
+        doc = Document(
             filename=filename,
-            chunk_index=i,
-            content=chunk_text_content,
-            embedding=embedding
+            file_hash=file_hash,
+            file_size=file_size,
+            file_data=content,  # Store original file
+            chunk_count=len(chunks)
         )
-        session.add(chunk)
+        session.add(doc)
+        await session.flush()
 
-    await session.commit()
-    print(f"✅ Upload complete: {filename} ({len(chunks)} chunks)")
+        # Create chunks
+        for i, (chunk_text_content, embedding) in enumerate(zip(chunks, embeddings)):
+            chunk = Chunk(
+                document_id=doc.id,
+                filename=filename,
+                chunk_index=i,
+                content=chunk_text_content,
+                embedding=embedding
+            )
+            session.add(chunk)
 
-    return {
-        "message": "Document indexed successfully",
-        "filename": filename,
-        "chunks": len(chunks),
-        "status": "updated" if existing_doc else "created"
-    }
+        await session.commit()
+        print(f"✅ Upload complete: {filename} ({len(chunks)} chunks)", flush=True)
+
+        return {
+            "message": "Document indexed successfully",
+            "filename": filename,
+            "chunks": len(chunks),
+            "status": "updated" if existing_doc else "created"
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        print(f"FATAL ERROR in upload_document: {type(e).__name__}: {str(e)}", flush=True)
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
 @app.get("/api/documents/{filename:path}/download")
