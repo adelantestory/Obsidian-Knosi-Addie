@@ -11,6 +11,12 @@ from pathlib import Path
 from typing import Optional, List
 from contextlib import asynccontextmanager
 
+# Helper function for timestamped logging
+def log(message: str):
+    """Print with timestamp"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{timestamp}] {message}", flush=True)
+
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header, Form, Query
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -245,8 +251,8 @@ async def extract_text_from_pdf_batch(content: bytes, filename: str, page_start:
     base64_pdf = base64.standard_b64encode(batch_pdf).decode("utf-8")
 
     try:
-        print(f"   ⏳ Sending pages {page_start+1}-{page_end} to Claude API...", flush=True)
-        print(f"   DEBUG: PDF batch size: {len(base64_pdf)} base64 chars, ~{len(batch_pdf)} bytes", flush=True)
+        log(f"   ⏳ Sending pages {page_start+1}-{page_end} to Claude API...")
+        log(f"   DEBUG: PDF batch size: {len(base64_pdf)} base64 chars, ~{len(batch_pdf)} bytes")
 
         import time
         start_time = time.time()
@@ -275,17 +281,17 @@ async def extract_text_from_pdf_batch(content: bytes, filename: str, page_start:
         )
 
         elapsed = time.time() - start_time
-        print(f"   DEBUG: API call completed in {elapsed:.1f}s", flush=True)
+        log(f"   DEBUG: API call completed in {elapsed:.1f}s")
 
         usage = message.usage
-        print(f"   ✅ Pages {page_start+1}-{page_end}: {usage.input_tokens} input tokens, {usage.output_tokens} output tokens", flush=True)
+        log(f"   ✅ Pages {page_start+1}-{page_end}: {usage.input_tokens} input tokens, {usage.output_tokens} output tokens")
 
         return message.content[0].text
     except anthropic.APITimeoutError as e:
-        print(f"   ❌ Timeout on pages {page_start+1}-{page_end}: {str(e)}", flush=True)
+        log(f"   ❌ Timeout on pages {page_start+1}-{page_end}: {str(e)}")
         raise HTTPException(status_code=504, detail=f"Claude API timeout on pages {page_start+1}-{page_end}")
     except anthropic.BadRequestError as e:
-        print(f"   DEBUG: BadRequestError: {str(e)}", flush=True)
+        log(f"   DEBUG: BadRequestError: {str(e)}")
         if "content filtering policy" in str(e):
             raise HTTPException(
                 status_code=400,
@@ -293,7 +299,7 @@ async def extract_text_from_pdf_batch(content: bytes, filename: str, page_start:
             )
         raise HTTPException(status_code=400, detail=f"Claude API error on pages {page_start+1}-{page_end}: {str(e)}")
     except Exception as e:
-        print(f"   ❌ UNEXPECTED ERROR in extract_text_from_pdf_batch: {type(e).__name__}: {str(e)}", flush=True)
+        log(f"   ❌ UNEXPECTED ERROR in extract_text_from_pdf_batch: {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()
         raise
@@ -305,7 +311,7 @@ async def extract_text_from_pdf(content: bytes, filename: str) -> str:
         raise HTTPException(status_code=500, detail="Claude API not configured")
 
     file_size_mb = len(content) / (1024 * 1024)
-    print(f"📄 Processing PDF: {filename} ({file_size_mb:.1f}MB)", flush=True)
+    log(f"📄 Processing PDF: {filename} ({file_size_mb:.1f}MB)")
 
     try:
         import io
@@ -317,26 +323,26 @@ async def extract_text_from_pdf(content: bytes, filename: str) -> str:
         warnings.filterwarnings('ignore', category=UserWarning, module='PyPDF2')
 
         # First, unlock/decrypt the PDF if it's protected using pikepdf
-        print(f"🔓 Unlocking PDF (if protected)...", flush=True)
+        log(f"🔓 Unlocking PDF (if protected)...")
         try:
             pdf = pikepdf.open(io.BytesIO(content))
             unlocked_buffer = io.BytesIO()
             pdf.save(unlocked_buffer)
             pdf.close()
             content = unlocked_buffer.getvalue()
-            print(f"✅ PDF unlocked successfully", flush=True)
+            log(f"✅ PDF unlocked successfully")
         except Exception as e:
-            print(f"⚠️  pikepdf unlock failed (may not be encrypted): {str(e)}", flush=True)
+            log(f"⚠️  pikepdf unlock failed (may not be encrypted): {str(e)}")
             # Continue with original content if unlock fails
 
         # Get page count
         reader = PdfReader(io.BytesIO(content))
         total_pages = len(reader.pages)
-        print(f"📚 PDF has {total_pages} pages", flush=True)
+        log(f"📚 PDF has {total_pages} pages")
 
         # For large PDFs (>5MB) or many pages (>50), process in batches
         if file_size_mb > 5 or total_pages > 50:
-            print(f"📑 Large PDF detected - splitting into batches of 20 pages each", flush=True)
+            log(f"📑 Large PDF detected - splitting into batches of 20 pages each")
 
             BATCH_SIZE = 20
             extracted_parts = []
@@ -344,19 +350,19 @@ async def extract_text_from_pdf(content: bytes, filename: str) -> str:
 
             for batch_num, batch_start in enumerate(range(0, total_pages, BATCH_SIZE), 1):
                 batch_end = min(batch_start + BATCH_SIZE, total_pages)
-                print(f"⚙️  Processing batch {batch_num}/{total_batches} (pages {batch_start+1}-{batch_end})...", flush=True)
+                log(f"⚙️  Processing batch {batch_num}/{total_batches} (pages {batch_start+1}-{batch_end})...")
 
                 batch_text = await extract_text_from_pdf_batch(content, filename, batch_start, batch_end)
                 extracted_parts.append(batch_text)
 
             # Combine all batches
             full_text = "\n\n".join(extracted_parts)
-            print(f"✅ Extraction complete: {len(full_text):,} characters from {total_pages} pages ({total_batches} batches)", flush=True)
+            log(f"✅ Extraction complete: {len(full_text):,} characters from {total_pages} pages ({total_batches} batches)")
             return full_text
 
         else:
             # Small PDF - process in one go
-            print(f"⚙️  Processing all {total_pages} pages in single request...", flush=True)
+            log(f"⚙️  Processing all {total_pages} pages in single request...")
             base64_pdf = base64.standard_b64encode(content).decode("utf-8")
 
             message = claude_client.messages.create(
@@ -495,15 +501,15 @@ async def upload_document(
 ):
     """Upload and index a document."""
     try:
-        print(f"DEBUG: Upload endpoint called", flush=True)
-        print(f"DEBUG: file.filename={file.filename}, path={path}", flush=True)
+        log(f"DEBUG: Upload endpoint called")
+        log(f"DEBUG: file.filename={file.filename}, path={path}")
 
         # Use path if provided (from watcher), otherwise use filename
         filename = path or file.filename
-        print(f"DEBUG: Using filename={filename}", flush=True)
+        log(f"DEBUG: Using filename={filename}")
 
         ext = Path(filename).suffix.lower()
-        print(f"DEBUG: File extension={ext}", flush=True)
+        log(f"DEBUG: File extension={ext}")
 
         if ext not in SUPPORTED_EXTENSIONS:
             raise HTTPException(
@@ -511,14 +517,14 @@ async def upload_document(
                 detail=f"Unsupported file type: {ext}. Supported: {', '.join(SUPPORTED_EXTENSIONS)}"
             )
 
-        print(f"📤 Upload started: {filename}", flush=True)
+        log(f"📤 Upload started: {filename}")
 
         # Read file content
-        print(f"DEBUG: About to read file content", flush=True)
+        log(f"DEBUG: About to read file content")
         content = await file.read()
         file_size = len(content)
         file_size_mb = file_size / (1024 * 1024)
-        print(f"📦 File read: {file_size_mb:.1f}MB", flush=True)
+        log(f"📦 File read: {file_size_mb:.1f}MB")
 
         if file_size > MAX_FILE_SIZE_MB * 1024 * 1024:
             raise HTTPException(
