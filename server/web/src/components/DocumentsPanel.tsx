@@ -145,7 +145,7 @@ export default function DocumentsPanel({ onDocumentsChanged }: Props) {
                 <span className="text-slate-300 font-medium">Processing {uploading}</span>
               </div>
               <div className="text-sm text-slate-400 pl-8">
-                <div>📤 Upload → 📄 Extract → ✂️ Chunk → 🧠 Embed → 💾 Save</div>
+                <div>Upload → Extract → Chunk → Embed → Save</div>
                 <div className="mt-1 text-xs text-slate-500">
                   For large PDFs, check server logs for batch progress (docker compose logs -f api)
                 </div>
