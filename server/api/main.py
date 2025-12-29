@@ -98,9 +98,23 @@ async def lifespan(app: FastAPI):
     # Initialize database
     await init_db()
     
-    # Initialize Claude client
+    # Initialize Claude client with custom timeout settings
     if ANTHROPIC_API_KEY:
-        claude_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        import httpx
+        # Create custom HTTP client with connection timeout
+        http_client = httpx.Client(
+            timeout=httpx.Timeout(
+                connect=30.0,  # 30s to establish connection
+                read=300.0,    # 5 minutes to read response
+                write=30.0,    # 30s to send request
+                pool=30.0      # 30s to get connection from pool
+            )
+        )
+        claude_client = anthropic.Anthropic(
+            api_key=ANTHROPIC_API_KEY,
+            http_client=http_client
+        )
+        print("Claude API client initialized with custom timeouts")
     else:
         print("WARNING: ANTHROPIC_API_KEY not set - chat and PDF parsing disabled")
     
@@ -232,6 +246,11 @@ async def extract_text_from_pdf_batch(content: bytes, filename: str, page_start:
 
     try:
         print(f"   ⏳ Sending pages {page_start+1}-{page_end} to Claude API...", flush=True)
+        print(f"   DEBUG: PDF batch size: {len(base64_pdf)} base64 chars, ~{len(batch_pdf)} bytes", flush=True)
+
+        import time
+        start_time = time.time()
+
         message = claude_client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=16000,
@@ -255,6 +274,9 @@ async def extract_text_from_pdf_batch(content: bytes, filename: str, page_start:
             }],
         )
 
+        elapsed = time.time() - start_time
+        print(f"   DEBUG: API call completed in {elapsed:.1f}s", flush=True)
+
         usage = message.usage
         print(f"   ✅ Pages {page_start+1}-{page_end}: {usage.input_tokens} input tokens, {usage.output_tokens} output tokens", flush=True)
 
@@ -263,12 +285,18 @@ async def extract_text_from_pdf_batch(content: bytes, filename: str, page_start:
         print(f"   ❌ Timeout on pages {page_start+1}-{page_end}: {str(e)}", flush=True)
         raise HTTPException(status_code=504, detail=f"Claude API timeout on pages {page_start+1}-{page_end}")
     except anthropic.BadRequestError as e:
+        print(f"   DEBUG: BadRequestError: {str(e)}", flush=True)
         if "content filtering policy" in str(e):
             raise HTTPException(
                 status_code=400,
                 detail=f"PDF content blocked by content filtering policy (pages {page_start+1}-{page_end})"
             )
         raise HTTPException(status_code=400, detail=f"Claude API error on pages {page_start+1}-{page_end}: {str(e)}")
+    except Exception as e:
+        print(f"   ❌ UNEXPECTED ERROR in extract_text_from_pdf_batch: {type(e).__name__}: {str(e)}", flush=True)
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 async def extract_text_from_pdf(content: bytes, filename: str) -> str:
