@@ -31,6 +31,9 @@ services:
       - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-100}
       - CHUNK_SIZE=${CHUNK_SIZE:-4000}
       - CHUNK_OVERLAP=${CHUNK_OVERLAP:-200}
+      - PDF_BATCH_SIZE=${PDF_BATCH_SIZE:-20}
+      - PDF_BATCHES_PER_MINUTE=${PDF_BATCHES_PER_MINUTE:-60}
+      - PDF_MAX_BATCHES=${PDF_MAX_BATCHES}
     depends_on:
       db:
         condition: service_healthy
