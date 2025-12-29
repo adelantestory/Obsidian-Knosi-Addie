@@ -319,11 +319,12 @@ async def extract_text_from_pdf(content: bytes, filename: str) -> str:
         # First, unlock/decrypt the PDF if it's protected using pikepdf
         print(f"🔓 Unlocking PDF (if protected)...", flush=True)
         try:
-            with pikepdf.open(io.BytesIO(content), allow_overwriting_input=True) as pdf:
-                unlocked_buffer = io.BytesIO()
-                pdf.save(unlocked_buffer)
-                content = unlocked_buffer.getvalue()
-                print(f"✅ PDF unlocked successfully", flush=True)
+            pdf = pikepdf.open(io.BytesIO(content))
+            unlocked_buffer = io.BytesIO()
+            pdf.save(unlocked_buffer)
+            pdf.close()
+            content = unlocked_buffer.getvalue()
+            print(f"✅ PDF unlocked successfully", flush=True)
         except Exception as e:
             print(f"⚠️  pikepdf unlock failed (may not be encrypted): {str(e)}", flush=True)
             # Continue with original content if unlock fails
