@@ -305,15 +305,28 @@ async def extract_text_from_pdf(content: bytes, filename: str) -> str:
         raise HTTPException(status_code=500, detail="Claude API not configured")
 
     file_size_mb = len(content) / (1024 * 1024)
-    print(f"📄 Processing PDF: {filename} ({file_size_mb:.1f}MB)")
+    print(f"📄 Processing PDF: {filename} ({file_size_mb:.1f}MB)", flush=True)
 
     try:
         import io
         import warnings
+        import pikepdf
         from PyPDF2 import PdfReader
 
         # Suppress PyPDF2 warnings about PDF structure issues
         warnings.filterwarnings('ignore', category=UserWarning, module='PyPDF2')
+
+        # First, unlock/decrypt the PDF if it's protected using pikepdf
+        print(f"🔓 Unlocking PDF (if protected)...", flush=True)
+        try:
+            with pikepdf.open(io.BytesIO(content), allow_overwriting_input=True) as pdf:
+                unlocked_buffer = io.BytesIO()
+                pdf.save(unlocked_buffer)
+                content = unlocked_buffer.getvalue()
+                print(f"✅ PDF unlocked successfully", flush=True)
+        except Exception as e:
+            print(f"⚠️  pikepdf unlock failed (may not be encrypted): {str(e)}", flush=True)
+            # Continue with original content if unlock fails
 
         # Get page count
         reader = PdfReader(io.BytesIO(content))
