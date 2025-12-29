@@ -209,32 +209,42 @@ async def extract_text_from_pdf(content: bytes, filename: str) -> str:
     """Extract text from PDF using Claude's vision capability."""
     if not claude_client:
         raise HTTPException(status_code=500, detail="Claude API not configured")
-    
+
     base64_pdf = base64.standard_b64encode(content).decode("utf-8")
-    
-    message = claude_client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=16000,
-        messages=[{
-            "role": "user",
-            "content": [
-                {
-                    "type": "document",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "application/pdf",
-                        "data": base64_pdf,
+
+    try:
+        message = claude_client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=16000,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "document",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "application/pdf",
+                            "data": base64_pdf,
+                        },
                     },
-                },
-                {
-                    "type": "text",
-                    "text": "Extract all text content from this PDF document. Preserve the structure including headings, paragraphs, and lists. Output only the extracted text, no commentary."
-                }
-            ],
-        }],
-    )
-    
-    return message.content[0].text
+                    {
+                        "type": "text",
+                        "text": "Extract all text content from this PDF document. Preserve the structure including headings, paragraphs, and lists. Output only the extracted text, no commentary."
+                    }
+                ],
+            }],
+        )
+
+        return message.content[0].text
+    except anthropic.BadRequestError as e:
+        if "content filtering policy" in str(e):
+            raise HTTPException(
+                status_code=400,
+                detail="PDF content was blocked by Claude's content filtering policy. This can happen with certain documents. Try a different PDF or contact support if this persists."
+            )
+        raise HTTPException(status_code=400, detail=f"Claude API error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF extraction failed: {str(e)}")
 
 
 async def extract_text_from_docx(content: bytes) -> str:
