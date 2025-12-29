@@ -139,17 +139,9 @@ export default function DocumentsPanel({ onDocumentsChanged }: Props) {
           }`}
         >
           {uploading ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <Loader2 className="w-5 h-5 animate-spin text-primary-400" />
-                <span className="text-slate-300 font-medium">Processing {uploading}</span>
-              </div>
-              <div className="text-sm text-slate-400 pl-8">
-                <div>Upload → Extract → Chunk → Embed → Save</div>
-                <div className="mt-1 text-xs text-slate-500">
-                  For large PDFs, check server logs for batch progress (docker compose logs -f api)
-                </div>
-              </div>
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-5 h-5 animate-spin text-primary-400" />
+              <span className="text-slate-300">Uploading {uploading}...</span>
             </div>
           ) : uploadStatus?.type === 'success' ? (
             <>

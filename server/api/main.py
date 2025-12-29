@@ -231,9 +231,11 @@ async def extract_text_from_pdf_batch(content: bytes, filename: str, page_start:
     base64_pdf = base64.standard_b64encode(batch_pdf).decode("utf-8")
 
     try:
+        print(f"   ⏳ Sending pages {page_start+1}-{page_end} to Claude API...")
         message = claude_client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=16000,
+            timeout=300.0,  # 5 minute timeout per batch
             messages=[{
                 "role": "user",
                 "content": [
@@ -254,9 +256,12 @@ async def extract_text_from_pdf_batch(content: bytes, filename: str, page_start:
         )
 
         usage = message.usage
-        print(f"   📖 Pages {page_start+1}-{page_end}: {usage.input_tokens} input tokens, {usage.output_tokens} output tokens")
+        print(f"   ✅ Pages {page_start+1}-{page_end}: {usage.input_tokens} input tokens, {usage.output_tokens} output tokens")
 
         return message.content[0].text
+    except anthropic.APITimeoutError as e:
+        print(f"   ❌ Timeout on pages {page_start+1}-{page_end}: {str(e)}")
+        raise HTTPException(status_code=504, detail=f"Claude API timeout on pages {page_start+1}-{page_end}")
     except anthropic.BadRequestError as e:
         if "content filtering policy" in str(e):
             raise HTTPException(
