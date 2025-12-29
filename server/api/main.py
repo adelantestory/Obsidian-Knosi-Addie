@@ -210,7 +210,11 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
 async def extract_text_from_pdf_batch(content: bytes, filename: str, page_start: int, page_end: int) -> str:
     """Extract text from a range of PDF pages using Claude."""
     import io
+    import warnings
     from PyPDF2 import PdfReader, PdfWriter
+
+    # Suppress PyPDF2 warnings about PDF structure issues
+    warnings.filterwarnings('ignore', category=UserWarning, module='PyPDF2')
 
     # Split PDF to page range
     reader = PdfReader(io.BytesIO(content))
@@ -272,7 +276,11 @@ async def extract_text_from_pdf(content: bytes, filename: str) -> str:
 
     try:
         import io
+        import warnings
         from PyPDF2 import PdfReader
+
+        # Suppress PyPDF2 warnings about PDF structure issues
+        warnings.filterwarnings('ignore', category=UserWarning, module='PyPDF2')
 
         # Get page count
         reader = PdfReader(io.BytesIO(content))
