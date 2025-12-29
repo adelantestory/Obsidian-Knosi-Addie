@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Upload, Trash2, FileText, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, Trash2, FileText, Loader2, CheckCircle, AlertCircle, Download } from 'lucide-react';
 import { api, Document } from '../api';
 
 interface Props {
@@ -67,6 +67,11 @@ export default function DocumentsPanel({ onDocumentsChanged }: Props) {
         message: err instanceof Error ? err.message : 'Delete failed',
       });
     }
+  };
+
+  const handleDownload = (filename: string) => {
+    const downloadUrl = api.getDownloadUrl(filename);
+    window.open(downloadUrl, '_blank');
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -177,24 +182,37 @@ export default function DocumentsPanel({ onDocumentsChanged }: Props) {
                 key={doc.filename}
                 className="flex items-center justify-between px-4 py-3 hover:bg-slate-700/50"
               >
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <FileText className="w-5 h-5 text-slate-400 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <div className="text-slate-200 truncate" title={doc.filename}>
+                  <div className="min-w-0 flex-1">
+                    <button
+                      onClick={() => handleDownload(doc.filename)}
+                      className="text-slate-200 hover:text-primary-400 truncate block text-left underline decoration-dotted underline-offset-2 transition-colors"
+                      title={`Download ${doc.filename}`}
+                    >
                       {doc.filename}
-                    </div>
+                    </button>
                     <div className="text-sm text-slate-500">
                       {formatSize(doc.file_size)} · {doc.chunk_count} chunks · {formatDate(doc.indexed_at)}
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleDelete(doc.filename)}
-                  className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded-lg transition-colors"
-                  title="Delete"
-                >
-                  <Trash2 size={18} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleDownload(doc.filename)}
+                    className="p-2 text-slate-400 hover:text-primary-400 hover:bg-slate-600 rounded-lg transition-colors"
+                    title="Download"
+                  >
+                    <Download size={18} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(doc.filename)}
+                    className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded-lg transition-colors"
+                    title="Delete"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>

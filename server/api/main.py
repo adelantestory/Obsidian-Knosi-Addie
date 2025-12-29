@@ -11,10 +11,11 @@ from pathlib import Path
 from typing import Optional, List
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header, Form, Query
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import Column, String, DateTime, Integer, Text, select, delete, func, text
+from sqlalchemy import Column, String, DateTime, Integer, Text, select, delete, func, text, LargeBinary
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from pgvector.sqlalchemy import Vector
@@ -41,11 +42,12 @@ Base = declarative_base()
 class Document(Base):
     """Document metadata table."""
     __tablename__ = "documents"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     filename = Column(String(500), unique=True, nullable=False, index=True)
     file_hash = Column(String(64), nullable=False)
     file_size = Column(Integer, nullable=False)
+    file_data = Column(LargeBinary, nullable=True)  # Store original file for download
     chunk_count = Column(Integer, nullable=False, default=0)
     indexed_at = Column(DateTime, default=datetime.utcnow)
 
@@ -205,12 +207,24 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
     return chunks
 
 
-async def extract_text_from_pdf(content: bytes, filename: str) -> str:
-    """Extract text from PDF using Claude's vision capability."""
-    if not claude_client:
-        raise HTTPException(status_code=500, detail="Claude API not configured")
+async def extract_text_from_pdf_batch(content: bytes, filename: str, page_start: int, page_end: int) -> str:
+    """Extract text from a range of PDF pages using Claude."""
+    import io
+    from PyPDF2 import PdfReader, PdfWriter
 
-    base64_pdf = base64.standard_b64encode(content).decode("utf-8")
+    # Split PDF to page range
+    reader = PdfReader(io.BytesIO(content))
+    writer = PdfWriter()
+
+    for page_num in range(page_start, min(page_end, len(reader.pages))):
+        writer.add_page(reader.pages[page_num])
+
+    # Write batch to bytes
+    batch_buffer = io.BytesIO()
+    writer.write(batch_buffer)
+    batch_pdf = batch_buffer.getvalue()
+
+    base64_pdf = base64.standard_b64encode(batch_pdf).decode("utf-8")
 
     try:
         message = claude_client.messages.create(
@@ -235,7 +249,89 @@ async def extract_text_from_pdf(content: bytes, filename: str) -> str:
             }],
         )
 
+        usage = message.usage
+        print(f"PDF extraction batch (pages {page_start+1}-{page_end}): {usage.input_tokens} input, {usage.output_tokens} output tokens")
+
         return message.content[0].text
+    except anthropic.BadRequestError as e:
+        if "content filtering policy" in str(e):
+            raise HTTPException(
+                status_code=400,
+                detail=f"PDF content blocked by content filtering policy (pages {page_start+1}-{page_end})"
+            )
+        raise HTTPException(status_code=400, detail=f"Claude API error on pages {page_start+1}-{page_end}: {str(e)}")
+
+
+async def extract_text_from_pdf(content: bytes, filename: str) -> str:
+    """Extract text from PDF using Claude's vision capability with batching for large files."""
+    if not claude_client:
+        raise HTTPException(status_code=500, detail="Claude API not configured")
+
+    file_size_mb = len(content) / (1024 * 1024)
+    print(f"Processing PDF: {filename} ({file_size_mb:.1f}MB)")
+
+    try:
+        import io
+        from PyPDF2 import PdfReader
+
+        # Get page count
+        reader = PdfReader(io.BytesIO(content))
+        total_pages = len(reader.pages)
+        print(f"PDF has {total_pages} pages")
+
+        # For large PDFs (>5MB) or many pages (>50), process in batches
+        if file_size_mb > 5 or total_pages > 50:
+            print(f"Large PDF detected - processing in batches of 20 pages")
+
+            BATCH_SIZE = 20
+            extracted_parts = []
+
+            for batch_start in range(0, total_pages, BATCH_SIZE):
+                batch_end = min(batch_start + BATCH_SIZE, total_pages)
+                print(f"Extracting pages {batch_start+1}-{batch_end}...")
+
+                batch_text = await extract_text_from_pdf_batch(content, filename, batch_start, batch_end)
+                extracted_parts.append(batch_text)
+
+            # Combine all batches
+            full_text = "\n\n".join(extracted_parts)
+            print(f"Extracted {len(full_text)} characters from {total_pages} pages in {len(extracted_parts)} batches")
+            return full_text
+
+        else:
+            # Small PDF - process in one go
+            print(f"Small PDF - processing all {total_pages} pages at once")
+            base64_pdf = base64.standard_b64encode(content).decode("utf-8")
+
+            message = claude_client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=16000,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "document",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "application/pdf",
+                                "data": base64_pdf,
+                            },
+                        },
+                        {
+                            "type": "text",
+                            "text": "Extract all text content from this PDF document. Preserve the structure including headings, paragraphs, and lists. Output only the extracted text, no commentary."
+                        }
+                    ],
+                }],
+            )
+
+            usage = message.usage
+            print(f"PDF extraction: {usage.input_tokens} input tokens, {usage.output_tokens} output tokens")
+
+            extracted_text = message.content[0].text
+            print(f"Extracted {len(extracted_text)} characters from {filename}")
+            return extracted_text
+
     except anthropic.BadRequestError as e:
         if "content filtering policy" in str(e):
             raise HTTPException(
@@ -244,6 +340,7 @@ async def extract_text_from_pdf(content: bytes, filename: str) -> str:
             )
         raise HTTPException(status_code=400, detail=f"Claude API error: {str(e)}")
     except Exception as e:
+        print(f"PDF extraction error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"PDF extraction failed: {str(e)}")
 
 
@@ -389,11 +486,12 @@ async def upload_document(
         await session.delete(existing_doc)
         await session.commit()
     
-    # Create new document
+    # Create new document (store original file for download)
     doc = Document(
         filename=filename,
         file_hash=file_hash,
         file_size=file_size,
+        file_data=content,  # Store original file
         chunk_count=len(chunks)
     )
     session.add(doc)
@@ -420,6 +518,53 @@ async def upload_document(
     }
 
 
+@app.get("/api/documents/{filename:path}/download")
+async def download_document(
+    filename: str,
+    api_key: Optional[str] = Query(None),
+    x_api_key: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_session)
+):
+    """Download the original document file."""
+    # Check API key from query param or header
+    if API_SECRET_KEY != "change-me-in-production":
+        provided_key = api_key or x_api_key
+        if not provided_key or provided_key != API_SECRET_KEY:
+            raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
+    result = await session.execute(
+        select(Document).where(Document.filename == filename)
+    )
+    doc = result.scalar_one_or_none()
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if not doc.file_data:
+        raise HTTPException(status_code=404, detail="Original file not available for this document")
+
+    # Determine content type based on file extension
+    ext = Path(filename).suffix.lower()
+    content_type_map = {
+        '.pdf': 'application/pdf',
+        '.md': 'text/markdown',
+        '.txt': 'text/plain',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.html': 'text/html',
+        '.htm': 'text/html',
+    }
+    content_type = content_type_map.get(ext, 'application/octet-stream')
+
+    # Return file with appropriate headers
+    return Response(
+        content=doc.file_data,
+        media_type=content_type,
+        headers={
+            'Content-Disposition': f'attachment; filename="{Path(filename).name}"'
+        }
+    )
+
+
 @app.delete("/api/documents/{filename:path}")
 async def delete_document(
     filename: str,
@@ -431,14 +576,14 @@ async def delete_document(
         select(Document).where(Document.filename == filename)
     )
     doc = result.scalar_one_or_none()
-    
+
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    
+
     await session.execute(delete(Chunk).where(Chunk.document_id == doc.id))
     await session.delete(doc)
     await session.commit()
-    
+
     return {"message": "Document deleted", "filename": filename}
 
 

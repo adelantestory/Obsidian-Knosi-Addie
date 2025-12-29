@@ -125,6 +125,15 @@ class ApiClient {
     if (!response.ok) throw new Error('Search failed');
     return response.json();
   }
+
+  getDownloadUrl(filename: string): string {
+    const apiKey = this.getApiKey();
+    const url = `${API_URL}/api/documents/${encodeURIComponent(filename)}/download`;
+    if (apiKey) {
+      return `${url}?api_key=${encodeURIComponent(apiKey)}`;
+    }
+    return url;
+  }
 }
 
 export const api = new ApiClient();
