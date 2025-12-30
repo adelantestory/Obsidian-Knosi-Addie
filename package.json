@@ -1,0 +1,14 @@
+{
+  "name": "knosi",
+  "version": "1.0.0",
+  "description": "Knosi - Self-hosted RAG platform with Claude",
+  "scripts": {
+    "release:prepare": "bash scripts/release-prepare.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/a11smiles/knosi.git"
+  },
+  "author": "Joshua Christman",
+  "license": "MIT"
+}
