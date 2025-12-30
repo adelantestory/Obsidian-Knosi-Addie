@@ -3,6 +3,19 @@
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
+// Helper to generate UUID (fallback for environments without crypto.randomUUID)
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback UUID v4 generation
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export interface Document {
   filename: string;
   file_size: number;
@@ -76,7 +89,7 @@ class ApiClient {
     onProgress?: (status: string) => void
   ): Promise<{ message: string; filename: string; chunks: number; status: string; upload_id: string }> {
     // Generate upload ID
-    const uploadId = crypto.randomUUID();
+    const uploadId = generateUUID();
 
     // If progress callback provided, start listening to SSE
     if (onProgress) {
