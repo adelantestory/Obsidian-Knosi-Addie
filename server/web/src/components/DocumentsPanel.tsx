@@ -71,9 +71,29 @@ export default function DocumentsPanel({ onDocumentsChanged }: Props) {
         onDocumentsChanged();
       } catch (err) {
         setUploadProgress(null);
+
+        // Make error messages more user-friendly
+        let errorMessage = 'Upload failed';
+        if (err instanceof Error) {
+          const msg = err.message.toLowerCase();
+          if (msg.includes('failed to fetch') || msg.includes('network')) {
+            errorMessage = 'Cannot connect to server. Please check your connection.';
+          } else if (msg.includes('unauthorized') || msg.includes('401')) {
+            errorMessage = 'Authentication failed. Please check your API key.';
+          } else if (msg.includes('too large') || msg.includes('file size')) {
+            errorMessage = 'File is too large.';
+          } else if (msg.includes('unsupported') || msg.includes('file type')) {
+            errorMessage = 'File type not supported.';
+          } else if (msg.includes('timeout')) {
+            errorMessage = 'Upload timed out. Please try again.';
+          } else {
+            errorMessage = err.message;
+          }
+        }
+
         setUploadStatus({
           type: 'error',
-          message: `${file.name}: ${err instanceof Error ? err.message : 'Upload failed'}`,
+          message: `${file.name}: ${errorMessage}`,
         });
       }
     }
