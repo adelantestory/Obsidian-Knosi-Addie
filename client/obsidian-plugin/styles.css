@@ -104,6 +104,12 @@
   text-decoration: underline;
 }
 
+.knosi-source-vault-indicator {
+  font-size: 0.85em;
+  opacity: 0.7;
+  font-style: italic;
+}
+
 .knosi-chat-loading .knosi-chat-message-content {
   font-style: italic;
   opacity: 0.7;

@@ -16,7 +16,9 @@
       "WebFetch(domain:app.khoj.dev)",
       "Bash(git checkout:*)",
       "Bash(git log:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "WebFetch(domain:docs.obsidian.md)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": []

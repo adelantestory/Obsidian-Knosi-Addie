@@ -793,41 +793,61 @@ class KnosiChatView extends ItemView {
 					href: '#'
 				});
 
+				// Add indicator if from different vault
+				const currentVaultName = this.plugin.app.vault.getName();
+				if (source.source_type === 'vault' && source.vault_name && source.vault_name !== currentVaultName) {
+					const vaultIndicator = itemEl.createEl('span', {
+						text: ` (from "${source.vault_name}")`,
+						cls: 'knosi-source-vault-indicator'
+					});
+				}
+
 				linkEl.addEventListener('click', async (e) => {
 					e.preventDefault();
 
 					if (source.source_type === 'vault') {
 						// Check if this file is from the current vault
-						const currentVaultName = this.plugin.app.vault.getName();
 						if (source.vault_name && source.vault_name !== currentVaultName) {
-							new Notice(`This file is from a different vault: "${source.vault_name}". Current vault: "${currentVaultName}"`);
-							return;
-						}
+							// File from different vault - open in WebView
+							const downloadUrl = `${this.plugin.settings.serverUrl}/api/documents/${encodeURIComponent(source.filename)}/download?api_key=${encodeURIComponent(this.plugin.settings.apiKey)}`;
 
-						// Try to open the file from the vault
-						const file = this.plugin.app.vault.getAbstractFileByPath(source.filename);
-						if (file instanceof TFile) {
-							// Open in new leaf
 							const leaf = this.plugin.app.workspace.getLeaf('tab');
-							await leaf.openFile(file);
+							await leaf.setViewState({
+								type: 'empty',
+								state: {}
+							});
+
+							const container = leaf.view.containerEl;
+							container.empty();
+							container.createEl('iframe', {
+								attr: {
+									src: downloadUrl,
+									style: 'width: 100%; height: 100%; border: none;'
+								}
+							});
 						} else {
-							new Notice(`File not found in vault: ${source.filename}`);
+							// File from current vault - try to open directly
+							const file = this.plugin.app.vault.getAbstractFileByPath(source.filename);
+							if (file instanceof TFile) {
+								const leaf = this.plugin.app.workspace.getLeaf('tab');
+								await leaf.openFile(file);
+							} else {
+								new Notice(`File not found in vault: ${source.filename}`);
+							}
 						}
 					} else {
 						// External source - open in Obsidian WebView (new tab)
 						const downloadUrl = `${this.plugin.settings.serverUrl}/api/documents/${encodeURIComponent(source.filename)}/download?api_key=${encodeURIComponent(this.plugin.settings.apiKey)}`;
 
-						// Open in new Obsidian leaf with WebView
 						const leaf = this.plugin.app.workspace.getLeaf('tab');
 						await leaf.setViewState({
 							type: 'empty',
 							state: {}
 						});
 
-						// Create iframe for external content
 						const container = leaf.view.containerEl;
 						container.empty();
-						const iframe = container.createEl('iframe', {
+						container.createEl('iframe', {
 							attr: {
 								src: downloadUrl,
 								style: 'width: 100%; height: 100%; border: none;'
