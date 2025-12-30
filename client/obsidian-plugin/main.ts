@@ -595,6 +595,8 @@ export default class KnosiSyncPlugin extends Plugin {
 
 class KnosiSettingTab extends PluginSettingTab {
 	plugin: KnosiSyncPlugin;
+	private tempSettings: KnosiSettings;
+	private originalSettings: KnosiSettings;
 
 	constructor(app: App, plugin: KnosiSyncPlugin) {
 		super(app, plugin);
@@ -605,17 +607,20 @@ class KnosiSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: 'Knosi Settings' });
+		// Store original settings and create a copy for editing
+		this.originalSettings = JSON.parse(JSON.stringify(this.plugin.settings));
+		this.tempSettings = JSON.parse(JSON.stringify(this.plugin.settings));
+
+		containerEl.createEl('h1', { text: 'Knosi' });
 
 		new Setting(containerEl)
 			.setName('Server URL')
 			.setDesc('URL of your Knosi API server')
 			.addText(text => text
 				.setPlaceholder('http://localhost:48550')
-				.setValue(this.plugin.settings.serverUrl)
-				.onChange(async (value) => {
-					this.plugin.settings.serverUrl = value;
-					await this.plugin.saveSettings();
+				.setValue(this.tempSettings.serverUrl)
+				.onChange((value) => {
+					this.tempSettings.serverUrl = value;
 				}));
 
 		new Setting(containerEl)
@@ -624,23 +629,20 @@ class KnosiSettingTab extends PluginSettingTab {
 			.addText(text => {
 				text
 					.setPlaceholder('Enter API key')
-					.setValue(this.plugin.settings.apiKey)
-					.onChange(async (value) => {
-						this.plugin.settings.apiKey = value;
-						await this.plugin.saveSettings();
+					.setValue(this.tempSettings.apiKey)
+					.onChange((value) => {
+						this.tempSettings.apiKey = value;
 					});
 				text.inputEl.type = 'password';
 			});
 
 		new Setting(containerEl)
 			.setName('Auto-sync')
-			.setDesc('Automatically queue files for sync when created or modified')
+			.setDesc('Automatically queue files for sync when created or modified (requires Obsidian restart)')
 			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.autoSync)
-				.onChange(async (value) => {
-					this.plugin.settings.autoSync = value;
-					await this.plugin.saveSettings();
-					new Notice('Restart Obsidian for auto-sync changes to take effect');
+				.setValue(this.tempSettings.autoSync)
+				.onChange((value) => {
+					this.tempSettings.autoSync = value;
 				}));
 
 		new Setting(containerEl)
@@ -648,20 +650,16 @@ class KnosiSettingTab extends PluginSettingTab {
 			.setDesc('How often to process the sync queue. Lower = more frequent syncs, higher = fewer API calls.')
 			.addSlider(slider => slider
 				.setLimits(1, 60, 1)
-				.setValue(this.plugin.settings.syncIntervalMinutes)
+				.setValue(this.tempSettings.syncIntervalMinutes)
 				.setDynamicTooltip()
-				.onChange(async (value) => {
-					this.plugin.settings.syncIntervalMinutes = value;
-					await this.plugin.saveSettings();
-					this.plugin.restartSyncInterval();
+				.onChange((value) => {
+					this.tempSettings.syncIntervalMinutes = value;
 				}))
 			.addExtraButton(button => button
 				.setIcon('reset')
 				.setTooltip('Reset to default (1 minute)')
-				.onClick(async () => {
-					this.plugin.settings.syncIntervalMinutes = 1;
-					await this.plugin.saveSettings();
-					this.plugin.restartSyncInterval();
+				.onClick(() => {
+					this.tempSettings.syncIntervalMinutes = 1;
 					this.display();
 				}));
 
@@ -669,45 +667,49 @@ class KnosiSettingTab extends PluginSettingTab {
 			.setName('Sync on startup')
 			.setDesc('Sync all files when Obsidian opens')
 			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.syncOnStartup)
-				.onChange(async (value) => {
-					this.plugin.settings.syncOnStartup = value;
-					await this.plugin.saveSettings();
+				.setValue(this.tempSettings.syncOnStartup)
+				.onChange((value) => {
+					this.tempSettings.syncOnStartup = value;
 				}));
 
 		new Setting(containerEl)
 			.setName('Supported extensions')
-			.setDesc('File extensions to sync (comma-separated). Changes will trigger a rescan.')
+			.setDesc('File extensions to sync (comma-separated). Changes will trigger a rescan when saved.')
 			.addText(text => text
 				.setPlaceholder('.md, .txt, .pdf')
-				.setValue(this.plugin.settings.supportedExtensions.join(', '))
-				.onChange(async (value) => {
-					const oldExtensions = [...this.plugin.settings.supportedExtensions];
-					this.plugin.settings.supportedExtensions = value
+				.setValue(this.tempSettings.supportedExtensions.join(', '))
+				.onChange((value) => {
+					this.tempSettings.supportedExtensions = value
 						.split(',')
 						.map(s => s.trim().toLowerCase())
 						.filter(s => s.startsWith('.'));
-					await this.plugin.saveSettingsAndRescan(oldExtensions);
 				}));
 
 		new Setting(containerEl)
 			.setName('Exclude patterns')
-			.setDesc('Paths/files to exclude (comma-separated). Supports directories (end with /), filenames, or glob patterns (*). Adding new patterns will delete matching files from server.')
+			.setDesc('Paths/files to exclude (comma-separated). Supports directories (end with /), filenames, or glob patterns (*). Adding new patterns will delete matching files from server when saved.')
 			.addTextArea(text => {
 				text
 					.setPlaceholder('.obsidian/, Templates/, *.tmp, **/*.backup')
-					.setValue(this.plugin.settings.excludePatterns.join(', '))
-					.onChange(async (value) => {
-						const oldPatterns = [...this.plugin.settings.excludePatterns];
-						this.plugin.settings.excludePatterns = value
+					.setValue(this.tempSettings.excludePatterns.join(', '))
+					.onChange((value) => {
+						this.tempSettings.excludePatterns = value
 							.split(',')
 							.map(s => s.trim())
 							.filter(s => s.length > 0);
-						await this.plugin.saveSettingsAndRescanExclusions(oldPatterns);
 					});
 				text.inputEl.rows = 3;
 				text.inputEl.style.width = '100%';
 			});
+
+		// Save button
+		new Setting(containerEl)
+			.addButton(button => button
+				.setButtonText('Save')
+				.setCta()
+				.onClick(async () => {
+					await this.saveSettings();
+				}));
 
 		containerEl.createEl('h3', { text: 'Actions' });
 
@@ -739,5 +741,43 @@ class KnosiSettingTab extends PluginSettingTab {
 				.setButtonText('Sync All')
 				.setCta()
 				.onClick(() => this.plugin.syncAllFiles()));
+	}
+
+	async saveSettings() {
+		// Check what changed
+		const extensionsChanged = JSON.stringify(this.originalSettings.supportedExtensions) !== JSON.stringify(this.tempSettings.supportedExtensions);
+		const patternsChanged = JSON.stringify(this.originalSettings.excludePatterns) !== JSON.stringify(this.tempSettings.excludePatterns);
+		const intervalChanged = this.originalSettings.syncIntervalMinutes !== this.tempSettings.syncIntervalMinutes;
+		const autoSyncChanged = this.originalSettings.autoSync !== this.tempSettings.autoSync;
+
+		// Apply temp settings to plugin
+		this.plugin.settings = JSON.parse(JSON.stringify(this.tempSettings));
+		await this.plugin.saveData(this.plugin.settings);
+
+		// Handle side effects
+		if (intervalChanged) {
+			this.plugin.restartSyncInterval();
+		}
+
+		if (autoSyncChanged) {
+			new Notice('Restart Obsidian for auto-sync changes to take effect');
+		}
+
+		if (extensionsChanged) {
+			const oldExtensions = this.originalSettings.supportedExtensions;
+			const newExtensions = this.tempSettings.supportedExtensions;
+			this.plugin.rescanVaultForNewExtensions(oldExtensions, newExtensions);
+		}
+
+		if (patternsChanged) {
+			const oldPatterns = this.originalSettings.excludePatterns;
+			const newPatterns = this.tempSettings.excludePatterns;
+			this.plugin.rescanVaultForNewExclusions(oldPatterns, newPatterns);
+		}
+
+		new Notice('Settings saved');
+
+		// Update original to match current
+		this.originalSettings = JSON.parse(JSON.stringify(this.tempSettings));
 	}
 }
