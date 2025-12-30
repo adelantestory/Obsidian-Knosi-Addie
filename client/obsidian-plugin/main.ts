@@ -112,6 +112,49 @@ export default class KnosiSyncPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
+	async saveSettingsAndRescan(oldExtensions: string[]) {
+		await this.saveData(this.settings);
+
+		// Check if supported extensions changed
+		const newExtensions = this.settings.supportedExtensions;
+		if (JSON.stringify(oldExtensions) !== JSON.stringify(newExtensions)) {
+			// Extensions changed - rescan vault for new file types
+			this.rescanVaultForNewExtensions(oldExtensions, newExtensions);
+		}
+	}
+
+	rescanVaultForNewExtensions(oldExtensions: string[], newExtensions: string[]) {
+		// Find newly added extensions
+		const addedExtensions = newExtensions.filter(ext => !oldExtensions.includes(ext));
+
+		if (addedExtensions.length === 0) {
+			return;
+		}
+
+		console.log(`Rescanning vault for new extensions: ${addedExtensions.join(', ')}`);
+		new Notice(`Rescanning vault for: ${addedExtensions.join(', ')}`);
+
+		// Find all files with the new extensions
+		const files = this.app.vault.getFiles();
+		let queuedCount = 0;
+
+		for (const file of files) {
+			const ext = '.' + file.extension.toLowerCase();
+			if (addedExtensions.includes(ext)) {
+				this.pendingUploads.add(file.path);
+				queuedCount++;
+			}
+		}
+
+		if (queuedCount > 0) {
+			console.log(`Queued ${queuedCount} files for sync`);
+			new Notice(`Queued ${queuedCount} files for sync`);
+			this.updateStatusBar('pending');
+		} else {
+			new Notice('No new files found to sync');
+		}
+	}
+
 	startSyncInterval() {
 		this.stopSyncInterval();
 		const intervalMs = this.settings.syncIntervalMinutes * 60 * 1000;
@@ -515,16 +558,17 @@ class KnosiSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Supported extensions')
-			.setDesc('File extensions to sync (comma-separated)')
+			.setDesc('File extensions to sync (comma-separated). Changes will trigger a rescan.')
 			.addText(text => text
 				.setPlaceholder('.md, .txt, .pdf')
 				.setValue(this.plugin.settings.supportedExtensions.join(', '))
 				.onChange(async (value) => {
+					const oldExtensions = [...this.plugin.settings.supportedExtensions];
 					this.plugin.settings.supportedExtensions = value
 						.split(',')
 						.map(s => s.trim().toLowerCase())
 						.filter(s => s.startsWith('.'));
-					await this.plugin.saveSettings();
+					await this.plugin.saveSettingsAndRescan(oldExtensions);
 				}));
 
 		containerEl.createEl('h3', { text: 'Actions' });
