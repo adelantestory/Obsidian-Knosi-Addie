@@ -124,8 +124,8 @@ async def upload_progress_stream(
         try:
             while True:
                 try:
-                    # Wait for progress update with 30s timeout
-                    data = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    # Wait for progress update with very short timeout for responsiveness
+                    data = await asyncio.wait_for(queue.get(), timeout=0.1)
 
                     log(f"📤 SSE yielding event to client: {data['status']}")
                     # Manual SSE formatting with immediate flush
@@ -148,8 +148,8 @@ async def upload_progress_stream(
                         break
 
                 except asyncio.TimeoutError:
-                    # Send keepalive to prevent buffering
-                    yield ": keepalive\n\n"
+                    # Timeout is normal - just continue checking for messages
+                    # Send keepalive every 30 iterations (~3 seconds) to prevent connection timeout
                     continue
 
         finally:
