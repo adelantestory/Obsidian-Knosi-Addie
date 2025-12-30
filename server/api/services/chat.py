@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 from models.document import Chunk
 from services.embeddings import get_embeddings
-from services.extraction import claude_client
+from services import extraction  # Import module, not variable
 from utils.logging import log
 
 
@@ -59,7 +59,7 @@ async def chat_with_documents(
     Returns:
         Dictionary with 'response' and 'sources' keys
     """
-    if not claude_client:
+    if not extraction.claude_client:
         raise HTTPException(status_code=500, detail="Claude API not configured")
 
     # Search for relevant chunks
@@ -93,7 +93,7 @@ Be concise but thorough. Cite sources when relevant by mentioning the filename."
         api_message = await loop.run_in_executor(
             None,
             partial(
-                claude_client.messages.create,
+                extraction.claude_client.messages.create,
                 model="claude-sonnet-4-20250514",
                 max_tokens=4096,
                 system=system_prompt,
