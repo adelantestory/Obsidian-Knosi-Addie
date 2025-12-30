@@ -6,6 +6,9 @@
     <title>Knosi - Your Personal Knowledge Base, Powered by AI</title>
     <meta name="description" content="Self-hosted knowledge base platform. Index and chat with your documents using Claude AI. No file size limits, complete privacy.">
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
@@ -23,6 +26,9 @@
                             800: '#5b21b6',
                             900: '#4c1d95',
                         }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
                     }
                 }
             }
@@ -32,7 +38,7 @@
         @keyframes fade-in-up {
             from {
                 opacity: 0;
-                transform: translateY(20px);
+                transform: translateY(30px);
             }
             to {
                 opacity: 1;
@@ -40,234 +46,343 @@
             }
         }
         .animate-fade-in-up {
-            animation: fade-in-up 0.6s ease-out;
+            animation: fade-in-up 0.8s ease-out forwards;
+            opacity: 0;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }
     </style>
 </head>
-<body class="bg-white text-gray-900">
+<body class="bg-gradient-to-br from-purple-50 via-white to-blue-50 text-gray-900">
     <!-- Navigation -->
-    <nav class="border-b border-gray-200 bg-white/80 backdrop-blur-sm fixed w-full z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <div class="flex items-center">
-                    <span class="text-2xl font-bold bg-gradient-to-r from-primary-600 to-purple-600 bg-clip-text text-transparent">Knosi</span>
+    <nav class="fixed w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
+        <div class="max-w-7xl mx-auto px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <div class="flex items-center space-x-2">
+                    <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                        </svg>
+                    </div>
+                    <span class="text-2xl font-bold gradient-text">Knosi</span>
                 </div>
                 <div class="hidden md:flex items-center space-x-8">
-                    <a href="#features" class="text-gray-600 hover:text-primary-600 transition-colors">Features</a>
-                    <a href="#how-it-works" class="text-gray-600 hover:text-primary-600 transition-colors">How It Works</a>
-                    <a href="#github" class="text-gray-600 hover:text-primary-600 transition-colors">GitHub</a>
-                    <a href="https://github.com/a11smiles/knosi" class="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg transition-colors">Get Started</a>
+                    <a href="#features" class="text-gray-600 hover:text-purple-600 transition-colors font-medium">Features</a>
+                    <a href="#how-it-works" class="text-gray-600 hover:text-purple-600 transition-colors font-medium">How It Works</a>
+                    <a href="https://github.com/a11smiles/knosi" class="text-gray-600 hover:text-purple-600 transition-colors font-medium">Docs</a>
+                    <a href="https://github.com/a11smiles/knosi" class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-2.5 rounded-xl transition-all shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 font-semibold">
+                        Get Started
+                    </a>
                 </div>
             </div>
         </div>
     </nav>
 
     <!-- Hero Section -->
-    <section class="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
-        <div class="max-w-7xl mx-auto text-center">
-            <h1 class="text-5xl md:text-6xl font-bold mb-6 animate-fade-in-up">
-                Your Personal <span class="bg-gradient-to-r from-primary-600 to-purple-600 bg-clip-text text-transparent">Knowledge Base</span>
-            </h1>
-            <p class="text-xl text-gray-600 mb-8 max-w-3xl mx-auto animate-fade-in-up" style="animation-delay: 0.1s;">
-                Self-hosted platform for indexing and chatting with your documents. Upload PDFs, Markdown, and other files to get AI-powered answers grounded in your content.
-            </p>
-            <div class="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up" style="animation-delay: 0.2s;">
-                <a href="https://github.com/a11smiles/knosi" class="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-lg text-lg font-semibold transition-colors inline-flex items-center justify-center">
-                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                    </svg>
-                    View on GitHub
-                </a>
-                <a href="#how-it-works" class="bg-white hover:bg-gray-50 text-primary-600 border-2 border-primary-600 px-8 py-3 rounded-lg text-lg font-semibold transition-colors">
-                    Learn More
-                </a>
+    <section class="pt-32 pb-24 px-6 lg:px-8 relative overflow-hidden">
+        <!-- Decorative background elements -->
+        <div class="absolute top-20 right-10 w-72 h-72 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float"></div>
+        <div class="absolute bottom-20 left-10 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-float" style="animation-delay: 2s;"></div>
+
+        <div class="max-w-7xl mx-auto relative z-10">
+            <div class="text-center max-w-4xl mx-auto">
+                <div class="inline-block mb-6 animate-fade-in-up">
+                    <span class="bg-gradient-to-r from-purple-600/10 to-blue-600/10 border border-purple-600/20 text-purple-700 px-4 py-2 rounded-full text-sm font-semibold">
+                        🚀 Self-Hosted & Open Source
+                    </span>
+                </div>
+                <h1 class="text-6xl md:text-7xl font-bold mb-8 leading-tight animate-fade-in-up" style="animation-delay: 0.1s;">
+                    Your Personal
+                    <span class="gradient-text block mt-2">Knowledge Base</span>
+                </h1>
+                <p class="text-xl md:text-2xl text-gray-600 mb-12 leading-relaxed animate-fade-in-up" style="animation-delay: 0.2s;">
+                    Self-hosted AI platform for indexing and chatting with your documents.<br class="hidden md:block"/>
+                    <span class="font-semibold text-gray-700">No file limits. Complete privacy. Powered by Claude.</span>
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up" style="animation-delay: 0.3s;">
+                    <a href="https://github.com/a11smiles/knosi" class="group bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all shadow-xl shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 inline-flex items-center justify-center">
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                        </svg>
+                        View on GitHub
+                        <svg class="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                        </svg>
+                    </a>
+                    <a href="#how-it-works" class="group bg-white hover:bg-gray-50 text-purple-600 border-2 border-purple-200 hover:border-purple-300 px-8 py-4 rounded-xl text-lg font-semibold transition-all shadow-lg hover:shadow-xl inline-flex items-center justify-center">
+                        Learn More
+                        <svg class="w-5 h-5 ml-2 group-hover:translate-y-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+                        </svg>
+                    </a>
+                </div>
             </div>
         </div>
     </section>
 
     <!-- Features Grid -->
-    <section id="features" class="py-20 bg-gray-50 px-4 sm:px-6 lg:px-8">
+    <section id="features" class="py-24 px-6 lg:px-8 relative">
         <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl font-bold mb-4">Why Choose Knosi?</h2>
-                <p class="text-xl text-gray-600">Built for privacy, flexibility, and power</p>
+            <div class="text-center mb-20">
+                <h2 class="text-5xl font-bold mb-4">
+                    Why <span class="gradient-text">Knosi?</span>
+                </h2>
+                <p class="text-xl text-gray-600">Everything you need for powerful document search</p>
             </div>
-            <div class="grid md:grid-cols-3 gap-8">
-                <div class="bg-white p-8 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4">
-                        <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Feature Card 1 -->
+                <div class="group bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all border border-gray-100 hover:border-purple-200 hover:-translate-y-2">
+                    <div class="w-14 h-14 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-purple-500/30">
+                        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                         </svg>
                     </div>
-                    <h3 class="text-xl font-semibold mb-2">Complete Privacy</h3>
-                    <p class="text-gray-600">Self-hosted on your infrastructure. Your documents never leave your control.</p>
+                    <h3 class="text-2xl font-bold mb-3 text-gray-800">Complete Privacy</h3>
+                    <p class="text-gray-600 leading-relaxed">Self-hosted on your infrastructure. Your documents never leave your control. Full data sovereignty.</p>
                 </div>
 
-                <div class="bg-white p-8 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4">
-                        <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <!-- Feature Card 2 -->
+                <div class="group bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all border border-gray-100 hover:border-purple-200 hover:-translate-y-2">
+                    <div class="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-blue-500/30">
+                        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
                     </div>
-                    <h3 class="text-xl font-semibold mb-2">No File Limits</h3>
-                    <p class="text-gray-600">Upload PDFs of any size. Default 100MB limit is configurable to meet your needs.</p>
+                    <h3 class="text-2xl font-bold mb-3 text-gray-800">No File Limits</h3>
+                    <p class="text-gray-600 leading-relaxed">Upload PDFs of any size. Default 100MB limit is fully configurable to meet your needs.</p>
                 </div>
 
-                <div class="bg-white p-8 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4">
-                        <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <!-- Feature Card 3 -->
+                <div class="group bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all border border-gray-100 hover:border-purple-200 hover:-translate-y-2">
+                    <div class="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-purple-500/30">
+                        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                         </svg>
                     </div>
-                    <h3 class="text-xl font-semibold mb-2">Powered by Claude</h3>
-                    <p class="text-gray-600">State-of-the-art PDF parsing and RAG chat using Anthropic's Claude AI.</p>
+                    <h3 class="text-2xl font-bold mb-3 text-gray-800">Powered by Claude</h3>
+                    <p class="text-gray-600 leading-relaxed">State-of-the-art PDF parsing and RAG chat using Anthropic's cutting-edge Claude AI.</p>
                 </div>
 
-                <div class="bg-white p-8 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4">
-                        <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+                <!-- Feature Card 4 -->
+                <div class="group bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all border border-gray-100 hover:border-purple-200 hover:-translate-y-2">
+                    <div class="w-14 h-14 bg-gradient-to-br from-pink-500 to-purple-500 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-pink-500/30">
+                        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
                     </div>
-                    <h3 class="text-xl font-semibold mb-2">Vector Search</h3>
-                    <p class="text-gray-600">Semantic search powered by pgvector and customizable embedding models.</p>
+                    <h3 class="text-2xl font-bold mb-3 text-gray-800">Semantic Search</h3>
+                    <p class="text-gray-600 leading-relaxed">Advanced vector search with pgvector and customizable embedding models for precise results.</p>
                 </div>
 
-                <div class="bg-white p-8 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4">
-                        <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <!-- Feature Card 5 -->
+                <div class="group bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all border border-gray-100 hover:border-purple-200 hover:-translate-y-2">
+                    <div class="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-blue-500/30">
+                        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
                     </div>
-                    <h3 class="text-xl font-semibold mb-2">Highly Configurable</h3>
-                    <p class="text-gray-600">Customize chunk sizes, embedding models, rate limits, and more via environment variables.</p>
+                    <h3 class="text-2xl font-bold mb-3 text-gray-800">Fully Configurable</h3>
+                    <p class="text-gray-600 leading-relaxed">Customize chunk sizes, embedding models, rate limits, and more via environment variables.</p>
                 </div>
 
-                <div class="bg-white p-8 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4">
-                        <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                <!-- Feature Card 6 -->
+                <div class="group bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all border border-gray-100 hover:border-purple-200 hover:-translate-y-2">
+                    <div class="w-14 h-14 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-cyan-500/30">
+                        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                         </svg>
                     </div>
-                    <h3 class="text-xl font-semibold mb-2">Simple Setup</h3>
-                    <p class="text-gray-600">Deploy with Docker Compose in minutes. Includes Obsidian plugin and filesystem watcher.</p>
+                    <h3 class="text-2xl font-bold mb-3 text-gray-800">Quick Setup</h3>
+                    <p class="text-gray-600 leading-relaxed">Deploy with Docker Compose in minutes. Includes Obsidian plugin and filesystem watcher.</p>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- How It Works -->
-    <section id="how-it-works" class="py-20 px-4 sm:px-6 lg:px-8">
-        <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl font-bold mb-4">How It Works</h2>
-                <p class="text-xl text-gray-600">Three simple steps to get started</p>
+    <section id="how-it-works" class="py-24 px-6 lg:px-8 bg-gradient-to-br from-purple-50 to-blue-50 relative overflow-hidden">
+        <div class="absolute inset-0 bg-grid-pattern opacity-5"></div>
+        <div class="max-w-7xl mx-auto relative z-10">
+            <div class="text-center mb-20">
+                <h2 class="text-5xl font-bold mb-4">
+                    How <span class="gradient-text">It Works</span>
+                </h2>
+                <p class="text-xl text-gray-600">Get started in three simple steps</p>
             </div>
             <div class="grid md:grid-cols-3 gap-12">
                 <div class="text-center">
-                    <div class="w-16 h-16 bg-primary-600 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">1</div>
-                    <h3 class="text-xl font-semibold mb-2">Deploy</h3>
-                    <p class="text-gray-600">Clone the repo and run <code class="bg-gray-100 px-2 py-1 rounded">docker compose up</code> on your server. Configure with your Anthropic API key.</p>
+                    <div class="relative mb-8">
+                        <div class="w-24 h-24 bg-gradient-to-br from-purple-600 to-blue-600 text-white rounded-3xl flex items-center justify-center text-4xl font-bold mx-auto shadow-2xl shadow-purple-500/30">
+                            1
+                        </div>
+                        <div class="absolute -top-2 -right-2 w-8 h-8 bg-yellow-400 rounded-full animate-pulse"></div>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4">Deploy</h3>
+                    <p class="text-gray-600 text-lg leading-relaxed">Clone the repo and run <code class="bg-purple-100 text-purple-700 px-3 py-1 rounded-lg font-mono text-sm">docker compose up</code> on your server. Configure with your Anthropic API key.</p>
                 </div>
                 <div class="text-center">
-                    <div class="w-16 h-16 bg-primary-600 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">2</div>
-                    <h3 class="text-xl font-semibold mb-2">Upload</h3>
-                    <p class="text-gray-600">Use the web UI, Obsidian plugin, or Python filesystem watcher to upload and index your documents.</p>
+                    <div class="relative mb-8">
+                        <div class="w-24 h-24 bg-gradient-to-br from-blue-600 to-purple-600 text-white rounded-3xl flex items-center justify-center text-4xl font-bold mx-auto shadow-2xl shadow-blue-500/30">
+                            2
+                        </div>
+                        <div class="absolute -top-2 -right-2 w-8 h-8 bg-green-400 rounded-full animate-pulse" style="animation-delay: 0.5s;"></div>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4">Upload</h3>
+                    <p class="text-gray-600 text-lg leading-relaxed">Use the web UI, Obsidian plugin, or Python filesystem watcher to upload and index your documents automatically.</p>
                 </div>
                 <div class="text-center">
-                    <div class="w-16 h-16 bg-primary-600 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">3</div>
-                    <h3 class="text-xl font-semibold mb-2">Chat</h3>
-                    <p class="text-gray-600">Ask questions and get answers grounded in your documents. Sources are cited automatically.</p>
+                    <div class="relative mb-8">
+                        <div class="w-24 h-24 bg-gradient-to-br from-purple-600 to-pink-600 text-white rounded-3xl flex items-center justify-center text-4xl font-bold mx-auto shadow-2xl shadow-purple-500/30">
+                            3
+                        </div>
+                        <div class="absolute -top-2 -right-2 w-8 h-8 bg-blue-400 rounded-full animate-pulse" style="animation-delay: 1s;"></div>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4">Chat</h3>
+                    <p class="text-gray-600 text-lg leading-relaxed">Ask questions and get AI-powered answers grounded in your documents. Sources are cited automatically for verification.</p>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Supported Formats -->
-    <section class="py-20 bg-gray-50 px-4 sm:px-6 lg:px-8">
+    <section class="py-24 px-6 lg:px-8">
         <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-12">
-                <h2 class="text-4xl font-bold mb-4">Supported File Types</h2>
+            <div class="text-center mb-16">
+                <h2 class="text-5xl font-bold mb-4">
+                    <span class="gradient-text">Universal</span> File Support
+                </h2>
                 <p class="text-xl text-gray-600">Index a wide variety of document formats</p>
             </div>
-            <div class="flex flex-wrap justify-center gap-4 max-w-4xl mx-auto">
-                <span class="bg-white px-6 py-3 rounded-lg shadow-sm font-medium">PDF</span>
-                <span class="bg-white px-6 py-3 rounded-lg shadow-sm font-medium">Markdown (.md)</span>
-                <span class="bg-white px-6 py-3 rounded-lg shadow-sm font-medium">Plain Text (.txt)</span>
-                <span class="bg-white px-6 py-3 rounded-lg shadow-sm font-medium">Org-mode (.org)</span>
-                <span class="bg-white px-6 py-3 rounded-lg shadow-sm font-medium">reStructuredText (.rst)</span>
-                <span class="bg-white px-6 py-3 rounded-lg shadow-sm font-medium">HTML</span>
-                <span class="bg-white px-6 py-3 rounded-lg shadow-sm font-medium">Word (.docx)</span>
+            <div class="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
+                <span class="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-2xl shadow-lg font-bold text-lg hover:scale-105 transition-transform">PDF</span>
+                <span class="bg-white border-2 border-purple-200 text-gray-700 px-8 py-4 rounded-2xl shadow-lg font-semibold text-lg hover:border-purple-400 hover:scale-105 transition-all">Markdown</span>
+                <span class="bg-white border-2 border-blue-200 text-gray-700 px-8 py-4 rounded-2xl shadow-lg font-semibold text-lg hover:border-blue-400 hover:scale-105 transition-all">Plain Text</span>
+                <span class="bg-white border-2 border-purple-200 text-gray-700 px-8 py-4 rounded-2xl shadow-lg font-semibold text-lg hover:border-purple-400 hover:scale-105 transition-all">Org-mode</span>
+                <span class="bg-white border-2 border-blue-200 text-gray-700 px-8 py-4 rounded-2xl shadow-lg font-semibold text-lg hover:border-blue-400 hover:scale-105 transition-all">reStructuredText</span>
+                <span class="bg-white border-2 border-purple-200 text-gray-700 px-8 py-4 rounded-2xl shadow-lg font-semibold text-lg hover:border-purple-400 hover:scale-105 transition-all">HTML</span>
+                <span class="bg-white border-2 border-blue-200 text-gray-700 px-8 py-4 rounded-2xl shadow-lg font-semibold text-lg hover:border-blue-400 hover:scale-105 transition-all">Word (.docx)</span>
             </div>
         </div>
     </section>
 
-    <!-- GitHub CTA -->
-    <section id="github" class="py-20 px-4 sm:px-6 lg:px-8">
-        <div class="max-w-4xl mx-auto text-center">
-            <h2 class="text-4xl font-bold mb-4">Open Source & Free</h2>
-            <p class="text-xl text-gray-600 mb-8">Knosi is fully open source. Deploy on your infrastructure, customize to your needs.</p>
-            <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="https://github.com/a11smiles/knosi" class="bg-gray-900 hover:bg-gray-800 text-white px-8 py-3 rounded-lg text-lg font-semibold transition-colors inline-flex items-center justify-center">
-                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <!-- CTA Section -->
+    <section class="py-24 px-6 lg:px-8 bg-gradient-to-br from-purple-600 to-blue-600 relative overflow-hidden">
+        <div class="absolute inset-0 bg-grid-pattern opacity-10"></div>
+        <div class="max-w-4xl mx-auto text-center relative z-10">
+            <h2 class="text-5xl md:text-6xl font-bold mb-6 text-white">
+                Open Source & Free Forever
+            </h2>
+            <p class="text-2xl text-purple-100 mb-12 leading-relaxed">
+                Knosi is fully open source. Deploy on your infrastructure,<br class="hidden md:block"/> customize to your needs, contribute to the community.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-6 justify-center">
+                <a href="https://github.com/a11smiles/knosi" class="group bg-white text-purple-600 px-10 py-5 rounded-2xl text-xl font-bold transition-all shadow-2xl hover:shadow-white/50 hover:scale-105 inline-flex items-center justify-center">
+                    <svg class="w-6 h-6 mr-3" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
                     </svg>
                     View on GitHub
+                    <svg class="w-6 h-6 ml-3 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
                 </a>
-                <a href="https://github.com/a11smiles/knosi#quick-start" class="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-lg text-lg font-semibold transition-colors">
-                    Read Documentation
+                <a href="https://github.com/a11smiles/knosi#quick-start" class="group bg-purple-800 hover:bg-purple-900 text-white px-10 py-5 rounded-2xl text-xl font-bold transition-all shadow-2xl hover:scale-105 inline-flex items-center justify-center border-2 border-purple-400">
+                    Read the Docs
+                    <svg class="w-6 h-6 ml-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
                 </a>
             </div>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer class="bg-gray-900 text-gray-400 py-12 px-4 sm:px-6 lg:px-8">
+    <footer class="bg-gray-900 text-gray-400 py-16 px-6 lg:px-8">
         <div class="max-w-7xl mx-auto">
-            <div class="grid md:grid-cols-3 gap-8">
-                <div>
-                    <h3 class="text-white text-lg font-semibold mb-4">Knosi</h3>
-                    <p class="text-sm">Your personal knowledge base, powered by AI.</p>
+            <div class="grid md:grid-cols-4 gap-12 mb-12">
+                <div class="md:col-span-2">
+                    <div class="flex items-center space-x-2 mb-4">
+                        <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                            </svg>
+                        </div>
+                        <span class="text-2xl font-bold text-white">Knosi</span>
+                    </div>
+                    <p class="text-gray-400 leading-relaxed mb-4">Your personal knowledge base,<br/>powered by AI.</p>
+                    <p class="text-sm text-gray-500">From Greek <em>gnosis</em> (γνῶσις) - knowledge</p>
                 </div>
                 <div>
                     <h3 class="text-white text-lg font-semibold mb-4">Resources</h3>
-                    <ul class="space-y-2 text-sm">
-                        <li><a href="https://github.com/a11smiles/knosi" class="hover:text-white transition-colors">GitHub</a></li>
-                        <li><a href="https://github.com/a11smiles/knosi#quick-start" class="hover:text-white transition-colors">Documentation</a></li>
-                        <li><a href="https://github.com/a11smiles/knosi/issues" class="hover:text-white transition-colors">Issues</a></li>
+                    <ul class="space-y-3">
+                        <li><a href="https://github.com/a11smiles/knosi" class="hover:text-purple-400 transition-colors">GitHub</a></li>
+                        <li><a href="https://github.com/a11smiles/knosi#quick-start" class="hover:text-purple-400 transition-colors">Documentation</a></li>
+                        <li><a href="https://github.com/a11smiles/knosi/issues" class="hover:text-purple-400 transition-colors">Issues</a></li>
+                        <li><a href="https://github.com/a11smiles/knosi/blob/main/LICENSE" class="hover:text-purple-400 transition-colors">License</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h3 class="text-white text-lg font-semibold mb-4">Connect</h3>
-                    <ul class="space-y-2 text-sm">
-                        <li><a href="https://knosi.ai" class="hover:text-white transition-colors">Website</a></li>
-                        <li><a href="https://github.com/a11smiles" class="hover:text-white transition-colors">Author</a></li>
+                    <h3 class="text-white text-lg font-semibold mb-4">Community</h3>
+                    <ul class="space-y-3">
+                        <li><a href="https://knosi.ai" class="hover:text-purple-400 transition-colors">Website</a></li>
+                        <li><a href="https://github.com/a11smiles" class="hover:text-purple-400 transition-colors">Author</a></li>
+                        <li><a href="https://github.com/a11smiles/knosi/stargazers" class="hover:text-purple-400 transition-colors">Star on GitHub</a></li>
                     </ul>
                 </div>
             </div>
-            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-sm">
-                <p>&copy; 2025 Knosi. Open source under MIT License.</p>
+            <div class="border-t border-gray-800 pt-8 text-center">
+                <p class="text-gray-500">&copy; 2025 Knosi. Open source under MIT License.</p>
             </div>
         </div>
     </footer>
 
     <script>
-        // Smooth scrolling for anchor links
+        // Smooth scrolling
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
                 const target = document.querySelector(this.getAttribute('href'));
                 if (target) {
-                    const offset = 80; // Account for fixed nav
-                    const targetPosition = target.getBoundingClientRect().top + window.pageYOffset - offset;
                     window.scrollTo({
-                        top: targetPosition,
+                        top: target.offsetTop - 80,
                         behavior: 'smooth'
                     });
                 }
             });
         });
+
+        // Intersection Observer for fade-in animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.animate-fade-in-up').forEach(el => observer.observe(el));
     </script>
 </body>
 </html>
