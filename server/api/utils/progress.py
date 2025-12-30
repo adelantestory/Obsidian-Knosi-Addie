@@ -22,6 +22,8 @@ async def send_progress(upload_id: str, status: str):
                 log(f"  ✓ Put into queue #{i}, qsize={queue.qsize()}")
             except Exception as e:
                 log(f"  ✗ Failed to send progress to queue #{i}: {e}")
+        # Yield control to event loop so SSE handler can process the queue
+        await asyncio.sleep(0)
     else:
         log(f"WARNING: send_progress called for unknown upload_id: {upload_id}")
 
