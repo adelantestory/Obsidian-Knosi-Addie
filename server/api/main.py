@@ -17,7 +17,7 @@ from fastapi.responses import Response, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sse_starlette.sse import EventSourceResponse
+from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 # Import our refactored modules
 from core import (
@@ -128,17 +128,16 @@ async def upload_progress_stream(
                     # Wait for progress update with 30s timeout
                     data = await asyncio.wait_for(queue.get(), timeout=30.0)
 
-                    # Format as SSE event with explicit newlines
-                    event_data = f"event: progress\ndata: {data['status']}\n\n"
-                    yield event_data.encode('utf-8')
+                    log(f"📤 SSE yielding event to client: {data['status']}")
+                    yield ServerSentEvent(data=data['status'], event="progress")
 
                     # Close connection if upload is complete or failed
                     if data['status'].startswith('complete:') or data['status'].startswith('error:'):
                         break
 
                 except asyncio.TimeoutError:
-                    # Send keepalive comment to prevent buffering
-                    yield f": keepalive\n\n".encode('utf-8')
+                    # Send keepalive to prevent buffering
+                    yield ServerSentEvent(comment="keepalive")
                     continue
 
         finally:
@@ -150,14 +149,12 @@ async def upload_progress_stream(
                 except ValueError:
                     pass
 
-    return StreamingResponse(
+    return EventSourceResponse(
         event_generator(),
-        media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",  # Disable nginx buffering
-            "Connection": "keep-alive",
-        }
+        },
+        ping=1  # Send ping every 1 second to force flush
     )
 
 
