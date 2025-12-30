@@ -130,6 +130,8 @@ async def upload_progress_stream(
 
                     log(f"📤 SSE yielding event to client: {data['status']}")
                     yield ServerSentEvent(data=data['status'], event="progress")
+                    # Force flush with a comment
+                    yield ServerSentEvent(comment="")
 
                     # Drain any additional messages that arrived while we were yielding
                     while not queue.empty():
@@ -137,6 +139,8 @@ async def upload_progress_stream(
                             extra_data = queue.get_nowait()
                             log(f"📤 SSE yielding queued event to client: {extra_data['status']}")
                             yield ServerSentEvent(data=extra_data['status'], event="progress")
+                            # Force flush with a comment
+                            yield ServerSentEvent(comment="")
 
                             if extra_data['status'].startswith('complete:') or extra_data['status'].startswith('error:'):
                                 return
