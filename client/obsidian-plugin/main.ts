@@ -146,7 +146,9 @@ export default class KnosiSyncPlugin extends Plugin {
 			return;
 		}
 
-		console.log(`Rescanning vault for new extensions: ${addedExtensions.join(', ')}`);
+		if (this.settings.verboseLogging) {
+			console.log(`Rescanning vault for new extensions: ${addedExtensions.join(', ')}`);
+		}
 		new Notice(`Rescanning vault for: ${addedExtensions.join(', ')}`);
 
 		// Find all files with the new extensions
@@ -162,7 +164,9 @@ export default class KnosiSyncPlugin extends Plugin {
 		}
 
 		if (queuedCount > 0) {
-			console.log(`Queued ${queuedCount} files for sync`);
+			if (this.settings.verboseLogging) {
+				console.log(`Queued ${queuedCount} files for sync`);
+			}
 			new Notice(`Queued ${queuedCount} files for sync`);
 			this.updateStatusBar('pending');
 		} else {
@@ -178,7 +182,9 @@ export default class KnosiSyncPlugin extends Plugin {
 			return;
 		}
 
-		console.log(`Rescanning vault for newly excluded patterns: ${addedPatterns.join(', ')}`);
+		if (this.settings.verboseLogging) {
+			console.log(`Rescanning vault for newly excluded patterns: ${addedPatterns.join(', ')}`);
+		}
 		new Notice(`Finding files to delete for: ${addedPatterns.join(', ')}`);
 
 		// Find all files that match the new exclusion patterns
@@ -229,7 +235,9 @@ export default class KnosiSyncPlugin extends Plugin {
 		}
 
 		if (queuedCount > 0) {
-			console.log(`Queued ${queuedCount} files for deletion`);
+			if (this.settings.verboseLogging) {
+				console.log(`Queued ${queuedCount} files for deletion`);
+			}
 			new Notice(`Queued ${queuedCount} files for deletion from server`);
 			this.updateStatusBar('pending');
 		} else {
@@ -241,7 +249,9 @@ export default class KnosiSyncPlugin extends Plugin {
 		this.stopSyncInterval();
 		const intervalMs = this.settings.syncIntervalMinutes * 60 * 1000;
 		this.syncIntervalId = window.setInterval(() => this.processQueue(), intervalMs);
-		console.log(`Sync interval started: every ${this.settings.syncIntervalMinutes} minute(s)`);
+		if (this.settings.verboseLogging) {
+			console.log(`Sync interval started: every ${this.settings.syncIntervalMinutes} minute(s)`);
+		}
 	}
 
 	stopSyncInterval() {
@@ -318,7 +328,9 @@ export default class KnosiSyncPlugin extends Plugin {
 
 		// Check if file is excluded
 		if (this.isExcluded(file.path)) {
-			console.log(`Skipping excluded file: ${file.path}`);
+			if (this.settings.verboseLogging) {
+				console.log(`Skipping excluded file: ${file.path}`);
+			}
 			return;
 		}
 
@@ -329,7 +341,9 @@ export default class KnosiSyncPlugin extends Plugin {
 		this.pendingUploads.add(file.path);
 		this.updateStatusBar('pending');
 
-		console.log(`Queued for sync: ${file.path} (${this.pendingUploads.size} in queue)`);
+		if (this.settings.verboseLogging) {
+			console.log(`Queued for sync: ${file.path} (${this.pendingUploads.size} in queue)`);
+		}
 	}
 
 	queueFileDelete(file: TAbstractFile) {
@@ -343,8 +357,10 @@ export default class KnosiSyncPlugin extends Plugin {
 		// Add to delete queue
 		this.pendingDeletes.add(file.path);
 		this.updateStatusBar('pending');
-		
-		console.log(`Queued for delete: ${file.path}`);
+
+		if (this.settings.verboseLogging) {
+			console.log(`Queued for delete: ${file.path}`);
+		}
 	}
 
 	handleFileRename(file: TAbstractFile, oldPath: string) {
@@ -362,7 +378,9 @@ export default class KnosiSyncPlugin extends Plugin {
 
 	async processQueue() {
 		if (this.syncInProgress) {
-			console.log('Sync already in progress, skipping');
+			if (this.settings.verboseLogging) {
+				console.log('Sync already in progress, skipping');
+			}
 			return;
 		}
 
@@ -375,8 +393,10 @@ export default class KnosiSyncPlugin extends Plugin {
 
 		this.syncInProgress = true;
 		this.updateStatusBar('syncing', `${uploadsToProcess.size} files`);
-		
-		console.log(`Processing queue: ${uploadsToProcess.size} uploads, ${deletesToProcess.size} deletes`);
+
+		if (this.settings.verboseLogging) {
+			console.log(`Processing queue: ${uploadsToProcess.size} uploads, ${deletesToProcess.size} deletes`);
+		}
 
 		let uploaded = 0;
 		let deleted = 0;
@@ -429,7 +449,9 @@ export default class KnosiSyncPlugin extends Plugin {
 			this.updateStatusBar('idle');
 		}
 
-		console.log(`Queue processed: ${uploaded} uploaded, ${deleted} deleted, ${errors} errors`);
+		if (this.settings.verboseLogging) {
+			console.log(`Queue processed: ${uploaded} uploaded, ${deleted} deleted, ${errors} errors`);
+		}
 	}
 
 	viewQueue() {
@@ -461,7 +483,9 @@ export default class KnosiSyncPlugin extends Plugin {
 
 			// Skip empty files
 			if (content.byteLength === 0) {
-				console.log(`Skipping empty file: ${file.path}`);
+				if (this.settings.verboseLogging) {
+					console.log(`Skipping empty file: ${file.path}`);
+				}
 				return;
 			}
 
