@@ -355,6 +355,7 @@ async def upload_document(
 async def download_document(
     filename: str,
     vault_name: Optional[str] = Query(None),
+    inline: bool = Query(False),
     session: AsyncSession = Depends(get_session),
     _: bool = Depends(verify_api_key_query_or_header)
 ):
@@ -392,15 +393,23 @@ async def download_document(
         '.htm': 'text/html',
         '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         '.org': 'text/plain',
-        '.rst': 'text/plain'
+        '.rst': 'text/plain',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp'
     }
     content_type = content_types.get(ext, 'application/octet-stream')
+
+    # Use inline disposition for viewing in iframe/browser, attachment for downloading
+    disposition = 'inline' if inline else 'attachment'
 
     return Response(
         content=doc.file_data,
         media_type=content_type,
         headers={
-            'Content-Disposition': f'attachment; filename="{filename}"'
+            'Content-Disposition': f'{disposition}; filename="{Path(filename).name}"'
         }
     )
 

@@ -853,7 +853,7 @@ class KnosiChatView extends ItemView {
 						// Check if this file is from the current vault
 						if (source.vault_name && source.vault_name !== currentVaultName) {
 							// File from different vault - open in WebView
-							const downloadUrl = `${this.plugin.settings.serverUrl}/api/documents/${encodeURIComponent(source.filename)}/download?api_key=${encodeURIComponent(this.plugin.settings.apiKey)}&vault_name=${encodeURIComponent(source.vault_name)}`;
+							const downloadUrl = `${this.plugin.settings.serverUrl}/api/documents/${encodeURIComponent(source.filename)}/download?api_key=${encodeURIComponent(this.plugin.settings.apiKey)}&vault_name=${encodeURIComponent(source.vault_name)}&inline=true`;
 
 							const leaf = this.plugin.app.workspace.getLeaf('tab');
 							await leaf.setViewState({
@@ -881,7 +881,7 @@ class KnosiChatView extends ItemView {
 						}
 					} else {
 						// External source (no vault_name) - open in Obsidian WebView (new tab)
-						const downloadUrl = `${this.plugin.settings.serverUrl}/api/documents/${encodeURIComponent(source.filename)}/download?api_key=${encodeURIComponent(this.plugin.settings.apiKey)}`;
+						const downloadUrl = `${this.plugin.settings.serverUrl}/api/documents/${encodeURIComponent(source.filename)}/download?api_key=${encodeURIComponent(this.plugin.settings.apiKey)}&inline=true`;
 
 						const leaf = this.plugin.app.workspace.getLeaf('tab');
 						await leaf.setViewState({
