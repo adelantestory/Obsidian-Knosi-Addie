@@ -736,7 +736,7 @@ class KnosiChatView extends ItemView {
 		// Cleanup
 	}
 
-	addMessage(role: 'user' | 'assistant', content: string, sources?: Array<{filename: string, chunk_index: number}>) {
+	addMessage(role: 'user' | 'assistant', content: string, sources?: Array<{filename: string, chunk_index: number, source_type?: string}>) {
 		const messageEl = this.messagesContainer.createEl('div', {
 			cls: `knosi-chat-message knosi-chat-message-${role}`
 		});
@@ -762,8 +762,8 @@ class KnosiChatView extends ItemView {
 						headerEl.appendText(part);
 					}
 				});
-			} else {
-				// Regular line
+			} else if (line.trim()) {
+				// Regular line (skip empty lines)
 				if (index > 0) contentEl.createEl('br');
 
 				// Handle bold markdown
@@ -792,11 +792,40 @@ class KnosiChatView extends ItemView {
 					href: '#'
 				});
 
-				linkEl.addEventListener('click', (e) => {
+				linkEl.addEventListener('click', async (e) => {
 					e.preventDefault();
-					// Open download URL in new window
-					const downloadUrl = `${this.plugin.settings.serverUrl}/api/documents/${encodeURIComponent(source.filename)}/download?api_key=${encodeURIComponent(this.plugin.settings.apiKey)}`;
-					window.open(downloadUrl, '_blank');
+
+					if (source.source_type === 'vault') {
+						// Try to open the file from the vault
+						const file = this.plugin.app.vault.getAbstractFileByPath(source.filename);
+						if (file instanceof TFile) {
+							// Open in new leaf
+							const leaf = this.plugin.app.workspace.getLeaf('tab');
+							await leaf.openFile(file);
+						} else {
+							new Notice(`File not found in vault: ${source.filename}`);
+						}
+					} else {
+						// External source - open in Obsidian WebView (new tab)
+						const downloadUrl = `${this.plugin.settings.serverUrl}/api/documents/${encodeURIComponent(source.filename)}/download?api_key=${encodeURIComponent(this.plugin.settings.apiKey)}`;
+
+						// Open in new Obsidian leaf with WebView
+						const leaf = this.plugin.app.workspace.getLeaf('tab');
+						await leaf.setViewState({
+							type: 'empty',
+							state: {}
+						});
+
+						// Create iframe for external content
+						const container = leaf.view.containerEl;
+						container.empty();
+						const iframe = container.createEl('iframe', {
+							attr: {
+								src: downloadUrl,
+								style: 'width: 100%; height: 100%; border: none;'
+							}
+						});
+					}
 				});
 			});
 		}

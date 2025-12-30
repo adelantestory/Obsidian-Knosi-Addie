@@ -78,7 +78,15 @@ async def chat_with_documents(
     for filename, content, chunk_index in chunks:
         context_parts.append(f"[Source: {filename}]\n{content}")
         if filename not in [s["filename"] for s in sources]:
-            sources.append({"filename": filename, "chunk_index": chunk_index})
+            # Determine source type based on filename structure
+            # Vault files have paths like "folder/file.md" without leading slashes
+            # External files typically have absolute paths or were uploaded via web
+            is_vault_file = not filename.startswith('/') and not filename.startswith('\\')
+            sources.append({
+                "filename": filename,
+                "chunk_index": chunk_index,
+                "source_type": "vault" if is_vault_file else "external"
+            })
 
     context = "\n\n---\n\n".join(context_parts)
 
