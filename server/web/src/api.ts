@@ -91,9 +91,10 @@ class ApiClient {
     // Generate upload ID
     const uploadId = generateUUID();
 
-    // If progress callback provided, start listening to SSE
+    // If progress callback provided, start listening to SSE BEFORE starting upload
     if (onProgress) {
-      this.subscribeToUploadProgress(uploadId, onProgress);
+      // Wait a bit for SSE connection to establish
+      await this.subscribeToUploadProgress(uploadId, onProgress);
     }
 
     const formData = new FormData();
@@ -116,28 +117,38 @@ class ApiClient {
     return response.json();
   }
 
-  private subscribeToUploadProgress(uploadId: string, onProgress: (status: string) => void) {
-    const apiKey = this.getApiKey();
-    const url = new URL(`${API_URL}/api/upload/${uploadId}/progress`);
+  private subscribeToUploadProgress(uploadId: string, onProgress: (status: string) => void): Promise<void> {
+    return new Promise((resolve) => {
+      const apiKey = this.getApiKey();
+      const url = new URL(`${API_URL}/api/upload/${uploadId}/progress`);
 
-    // EventSource doesn't support custom headers, so pass API key as query param
-    if (apiKey) {
-      url.searchParams.append('api_key', apiKey);
-    }
-
-    const eventSource = new EventSource(url.toString());
-
-    eventSource.addEventListener('progress', (event) => {
-      onProgress(event.data);
-
-      // Close connection if done
-      if (event.data.startsWith('complete:') || event.data.startsWith('error:')) {
-        eventSource.close();
+      // EventSource doesn't support custom headers, so pass API key as query param
+      if (apiKey) {
+        url.searchParams.append('api_key', apiKey);
       }
-    });
 
-    eventSource.addEventListener('error', () => {
-      eventSource.close();
+      const eventSource = new EventSource(url.toString());
+
+      eventSource.addEventListener('open', () => {
+        console.log('SSE connection opened for upload:', uploadId);
+        resolve(); // Connection established, can start upload now
+      });
+
+      eventSource.addEventListener('progress', (event) => {
+        console.log('SSE progress:', event.data);
+        onProgress(event.data);
+
+        // Close connection if done
+        if (event.data.startsWith('complete:') || event.data.startsWith('error:')) {
+          eventSource.close();
+        }
+      });
+
+      eventSource.addEventListener('error', (error) => {
+        console.error('SSE error:', error);
+        eventSource.close();
+        resolve(); // Resolve anyway to not block upload
+      });
     });
   }
 
