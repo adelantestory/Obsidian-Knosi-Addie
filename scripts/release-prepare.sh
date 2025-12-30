@@ -60,7 +60,7 @@ Checking in necessary files for Obsidian plugin distribution."
 
 # Push the branch
 echo "⬆️  Pushing release branch..."
-git push -u origin main
+git push origin main
 
 # Create and push tag (use refs/tags/ to be explicit)
 echo "🏷️  Creating tag: $VERSION"
