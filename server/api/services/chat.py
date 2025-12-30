@@ -27,14 +27,14 @@ async def search_similar_chunks(
         limit: Maximum number of chunks to return
 
     Returns:
-        List of tuples: (filename, content, chunk_index)
+        List of tuples: (filename, content, chunk_index, vault_name)
     """
     # Generate embedding for query
     query_embedding = (await get_embeddings([query]))[0]
 
     # Search for relevant chunks using pgvector
     result = await session.execute(
-        select(Chunk.filename, Chunk.content, Chunk.chunk_index)
+        select(Chunk.filename, Chunk.content, Chunk.chunk_index, Chunk.vault_name)
         .order_by(Chunk.embedding.cosine_distance(query_embedding))
         .limit(limit)
     )
@@ -75,18 +75,20 @@ async def chat_with_documents(
     context_parts = []
     sources = []
 
-    for filename, content, chunk_index in chunks:
+    for filename, content, chunk_index, vault_name in chunks:
         context_parts.append(f"[Source: {filename}]\n{content}")
         if filename not in [s["filename"] for s in sources]:
-            # Determine source type based on filename structure
-            # Vault files have paths like "folder/file.md" without leading slashes
-            # External files typically have absolute paths or were uploaded via web
-            is_vault_file = not filename.startswith('/') and not filename.startswith('\\')
-            sources.append({
+            # Determine source type based on vault_name field
+            # If vault_name is set, it's from Obsidian vault; otherwise external
+            is_vault_file = vault_name is not None
+            source_obj = {
                 "filename": filename,
                 "chunk_index": chunk_index,
                 "source_type": "vault" if is_vault_file else "external"
-            })
+            }
+            if vault_name:
+                source_obj["vault_name"] = vault_name
+            sources.append(source_obj)
 
     context = "\n\n---\n\n".join(context_parts)
 

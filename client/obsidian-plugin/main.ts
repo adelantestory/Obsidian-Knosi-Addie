@@ -516,6 +516,7 @@ export default class KnosiSyncPlugin extends Plugin {
 			const formData = new FormData();
 			formData.append('file', blob, file.name);
 			formData.append('path', file.path);
+			formData.append('vault_name', this.app.vault.getName());
 
 			const response = await fetch(`${this.settings.serverUrl}/api/upload`, {
 				method: 'POST',
@@ -736,7 +737,7 @@ class KnosiChatView extends ItemView {
 		// Cleanup
 	}
 
-	addMessage(role: 'user' | 'assistant', content: string, sources?: Array<{filename: string, chunk_index: number, source_type?: string}>) {
+	addMessage(role: 'user' | 'assistant', content: string, sources?: Array<{filename: string, chunk_index: number, source_type?: string, vault_name?: string}>) {
 		const messageEl = this.messagesContainer.createEl('div', {
 			cls: `knosi-chat-message knosi-chat-message-${role}`
 		});
@@ -796,6 +797,13 @@ class KnosiChatView extends ItemView {
 					e.preventDefault();
 
 					if (source.source_type === 'vault') {
+						// Check if this file is from the current vault
+						const currentVaultName = this.plugin.app.vault.getName();
+						if (source.vault_name && source.vault_name !== currentVaultName) {
+							new Notice(`This file is from a different vault: "${source.vault_name}". Current vault: "${currentVaultName}"`);
+							return;
+						}
+
 						// Try to open the file from the vault
 						const file = this.plugin.app.vault.getAbstractFileByPath(source.filename);
 						if (file instanceof TFile) {

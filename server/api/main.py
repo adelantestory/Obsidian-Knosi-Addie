@@ -199,6 +199,7 @@ async def upload_document(
     file: UploadFile = File(...),
     path: Optional[str] = Form(None),
     upload_id: Optional[str] = Form(None),
+    vault_name: Optional[str] = Form(None),
     session: AsyncSession = Depends(get_session),
     _: bool = Depends(verify_api_key)
 ):
@@ -292,7 +293,8 @@ async def upload_document(
             file_hash=file_hash,
             file_size=file_size,
             file_data=content,
-            chunk_count=len(chunks)
+            chunk_count=len(chunks),
+            vault_name=vault_name
         )
         session.add(doc)
         await session.flush()
@@ -304,7 +306,8 @@ async def upload_document(
                 filename=filename,
                 chunk_index=i,
                 content=chunk,
-                embedding=embedding
+                embedding=embedding,
+                vault_name=vault_name
             )
             session.add(chunk_obj)
 

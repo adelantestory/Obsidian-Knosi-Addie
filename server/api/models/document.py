@@ -20,6 +20,7 @@ class Document(Base):
     file_size = Column(Integer, nullable=False)
     file_data = Column(LargeBinary, nullable=True)  # Store original file for download
     chunk_count = Column(Integer, nullable=False, default=0)
+    vault_name = Column(String(200), nullable=True, index=True)  # For Obsidian vault tracking
     indexed_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -33,3 +34,4 @@ class Chunk(Base):
     chunk_index = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
     embedding = Column(Vector(EMBEDDING_DIM))
+    vault_name = Column(String(200), nullable=True, index=True)  # For Obsidian vault tracking
