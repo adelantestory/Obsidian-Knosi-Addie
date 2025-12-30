@@ -35,7 +35,7 @@ services:
       - EMBEDDING_DIM=${EMBEDDING_DIM:-384}
       - PDF_BATCH_SIZE=${PDF_BATCH_SIZE:-20}
       - PDF_BATCHES_PER_MINUTE=${PDF_BATCHES_PER_MINUTE:-60}
-      - PDF_MAX_BATCHES=${PDF_MAX_BATCHES}
+      - PDF_MAX_BATCHES=${PDF_MAX_BATCHES:-}
     depends_on:
       db:
         condition: service_healthy
