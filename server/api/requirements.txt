@@ -9,3 +9,4 @@ python-multipart==0.0.9
 pydantic==2.6.1
 pypdf2==3.0.1
 pikepdf==8.10.1
+pillow==10.2.0

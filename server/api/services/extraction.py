@@ -302,6 +302,60 @@ async def extract_text_from_image(content: bytes, filename: str) -> str:
     }
 
     media_type = media_type_map.get(ext, 'image/jpeg')
+
+    # Claude has a 5MB limit for images
+    MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB in bytes
+
+    if len(content) > MAX_IMAGE_SIZE:
+        # Silently resize image to fit under 5MB
+        try:
+            from PIL import Image
+            img = Image.open(io.BytesIO(content))
+
+            # Convert to RGB if necessary (for PNG with transparency, etc.)
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                img = background
+
+            # Progressively reduce quality/size until under 5MB
+            quality = 85
+            while quality > 20:
+                output = io.BytesIO()
+                img.save(output, format='JPEG', quality=quality, optimize=True)
+                resized_content = output.getvalue()
+
+                if len(resized_content) <= MAX_IMAGE_SIZE:
+                    content = resized_content
+                    media_type = 'image/jpeg'
+                    break
+
+                quality -= 10
+
+            if len(content) > MAX_IMAGE_SIZE:
+                # Still too large, reduce dimensions
+                scale = 0.8
+                while scale > 0.3 and len(content) > MAX_IMAGE_SIZE:
+                    new_size = (int(img.width * scale), int(img.height * scale))
+                    resized_img = img.resize(new_size, Image.Resampling.LANCZOS)
+                    output = io.BytesIO()
+                    resized_img.save(output, format='JPEG', quality=85, optimize=True)
+                    content = output.getvalue()
+                    scale -= 0.1
+
+                if len(content) > MAX_IMAGE_SIZE:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Image too large even after resizing. Maximum is 5MB."
+                    )
+        except ImportError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Image too large ({len(content)} bytes). Maximum is 5MB. Install Pillow to enable auto-resize."
+            )
+
     base64_image = base64.standard_b64encode(content).decode("utf-8")
 
     try:
@@ -344,10 +398,16 @@ async def extract_text_from_image(content: bytes, filename: str) -> str:
         return message.content[0].text
 
     except anthropic.BadRequestError as e:
-        if "content filtering policy" in str(e):
+        error_str = str(e)
+        if "content filtering policy" in error_str:
             raise HTTPException(
                 status_code=400,
                 detail="Image content was blocked by Claude's content filtering policy."
+            )
+        elif "image exceeds" in error_str or "5 MB maximum" in error_str:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Image too large for Claude API (5MB limit). This shouldn't happen - please report this issue."
             )
         raise HTTPException(status_code=400, detail=f"Claude API error: {str(e)}")
     except Exception as e:
