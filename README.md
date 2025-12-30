@@ -6,15 +6,9 @@ Knosi is a self-hosted platform for indexing and chatting with your documents. U
 
 🌐 **[knosi.ai](https://knosi.ai)**
 
-> **📚 Project Documentation**
-> 
-> See the `docs/` folder for detailed context:
-> - [CONTEXT.md](docs/CONTEXT.md) - Why this project exists, problems it solves
-> - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Technical design and component details
-> - [DECISIONS.md](docs/DECISIONS.md) - Key decisions and their rationale
-> - [CURRENT_STATE.md](docs/CURRENT_STATE.md) - What's complete, what's not, next steps
+---
 
-## Architecture
+## Quick Overview
 
 ```
 ┌─────────────────────────────────────┐      ┌──────────────────────────────────────────────┐
@@ -23,7 +17,7 @@ Knosi is a self-hosted platform for indexing and chatting with your documents. U
 │  ┌───────────────────────────────┐  │      │  ┌────────────────────────────────────────┐ │
 │  │  Obsidian Plugin              │  │      │  │         React Frontend (:48080)        │ │
 │  │  - or -                       │  │      │  └───────────────────┬────────────────────┘ │
-│  │  knosi-sync.py                │  │      │                      │                      │
+│  │  Filesystem Watcher           │  │      │                      │                      │
 │  └───────────────┬───────────────┘  │      │                      ▼                      │
 │                  │                  │ HTTP │  ┌────────────────────────────────────────┐ │
 │                  └──────────────────┼─────►│  │      FastAPI Backend (:48550)          │ │
@@ -37,129 +31,99 @@ Knosi is a self-hosted platform for indexing and chatting with your documents. U
                                              └──────────────────────────────────────────────┘
 ```
 
-## Services
+---
 
-| Service | Port | Description |
-|---------|------|-------------|
-| **Web** | 48080 | React frontend - chat UI, document management |
-| **API** | 48550 | FastAPI backend - all business logic |
-| **DB** | 5432 (internal) | PostgreSQL + pgvector |
+## Features
 
-## Client Options
+- 🔒 **Complete Privacy** - Self-hosted, your data never leaves your control
+- 📄 **No File Limits** - Upload PDFs of any size (default 100MB, configurable)
+- ⚡ **Powered by Claude** - State-of-the-art PDF parsing and RAG chat
+- 🔍 **Semantic Search** - Advanced vector search with pgvector
+- 🔄 **Auto-Sync** - Obsidian plugin and filesystem watcher for automatic uploads
+- ⚙️ **Fully Configurable** - Customize embedding models, chunk sizes, and more
 
-| Client | Best For | Auto-start | Catches |
-|--------|----------|------------|---------|
-| **Obsidian Plugin** | Obsidian-only workflows | Built-in | Obsidian edits only |
-| **Python Script** | Any editor, CLI, Finder | macOS/Windows | All filesystem changes |
+---
+
+## Documentation
+
+📚 **Deployment Guides:**
+- **[Server Deployment](DEPLOYMENT.md)** - Deploy Knosi on a VPS with Docker
+- **[Obsidian Plugin](client/obsidian-plugin/DEPLOYMENT.md)** - Sync your Obsidian vault
+- **[Filesystem Watcher](client/FILESYSTEM_WATCHER.md)** - Watch any folder for changes
+
+📖 **Additional Documentation:**
+- [CONTEXT.md](docs/CONTEXT.md) - Why this project exists, problems it solves
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Technical design and component details
+- [DECISIONS.md](docs/DECISIONS.md) - Key decisions and their rationale
+- [CURRENT_STATE.md](docs/CURRENT_STATE.md) - What's complete, what's not, next steps
+
+---
 
 ## Quick Start
 
-### 1. Deploy Server (on your VPS)
+### 1. Deploy the Server
 
-```bash
-cd server
-
-# Configure environment
-cp .env.example .env
-nano .env  # Add your ANTHROPIC_API_KEY, POSTGRES_PASSWORD, API_SECRET_KEY
-
-# Optional: Configure block storage for PostgreSQL data
-# If you want to use separate block storage (recommended for large document collections):
-# 1. Find block device UUID: sudo blkid /dev/vdb
-# 2. Add to /etc/fstab for auto-mount on reboot:
-#    UUID=your-uuid  /mnt/knosi-data  ext4  defaults,nofail  0  2
-# 3. Mount: sudo mkdir -p /mnt/knosi-data && sudo mount -a
-# 4. Create subdirectory: sudo mkdir -p /mnt/knosi-data/pgdata
-# 5. Set ownership: sudo chown -R 999:999 /mnt/knosi-data/pgdata
-# 6. Add to .env: POSTGRES_DATA_PATH=/mnt/knosi-data/pgdata
-
-# Start services
-docker compose up -d
-
-# Check logs
-docker compose logs -f api
-```
+Follow the **[Server Deployment Guide](DEPLOYMENT.md)** to:
+- Set up Docker on your VPS
+- Configure environment variables
+- Start the Knosi services
 
 Services will be available at:
 - **Web UI**: `http://your-server:48080`
 - **API**: `http://your-server:48550`
 
-### 2. Install Client (choose one)
+### 2. Choose a Client
 
-#### Option A: Obsidian Plugin
+Pick one based on your workflow:
 
-```bash
-# Copy plugin to your vault
-cp -r client/obsidian-plugin /path/to/your/vault/.obsidian/plugins/knosi-sync
+| Client | Best For | Guide |
+|--------|----------|-------|
+| **Obsidian Plugin** | Obsidian-only workflows | [Obsidian Deployment Guide](client/obsidian-plugin/DEPLOYMENT.md) |
+| **Filesystem Watcher** | Any editor, catches all filesystem changes | [Watcher Deployment Guide](client/FILESYSTEM_WATCHER.md) |
 
-# Build the plugin
-cd /path/to/your/vault/.obsidian/plugins/knosi-sync
-npm install
-npm run build
-```
+### 3. Start Syncing
 
-Then enable in Obsidian: Settings → Community Plugins → Enable "Knosi Sync"
+- **Obsidian**: Enable plugin, configure server URL, files sync automatically
+- **Watcher**: Run `python knosi-sync.py --server ... --vault ...`
 
-Configure in Settings → Knosi Sync:
-- Set your server URL (API endpoint: `http://your-server:48550`)
-- Set API key (if required)
-- Enable auto-sync
+### 4. Chat with Your Documents
 
-#### Option B: Python Script (watches all filesystem changes)
+Visit `http://your-server:48080` and start asking questions!
 
-```bash
-cd client
+---
 
-# Create virtual environment (optional but recommended)
-python3 -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+## Supported File Types
 
-# Install dependencies
-pip install -r requirements.txt
-```
+- 📕 PDF (parsed via Claude API - handles locked PDFs)
+- 📝 Markdown (.md)
+- 📄 Plain text (.txt)
+- 🌐 HTML (.html, .htm)
+- 📋 Org-mode (.org)
+- 📜 reStructuredText (.rst)
+- 📘 Word documents (.docx)
 
-### 3. Run Python Client (if using Option B)
+---
 
-```bash
-# Basic usage
-python knosi-sync.py --server http://your-server:48550 --vault ~/Documents/vault
+## Architecture
 
-# With API key
-python knosi-sync.py \
-  --server http://your-server:48550 \
-  --vault ~/Documents/vault \
-  --api-key your-api-secret-key
+| Service | Port | Description |
+|---------|------|-------------|
+| **Web** | 48080 | React frontend - chat UI, document management |
+| **API** | 48550 | FastAPI backend - indexing, search, chat |
+| **DB** | 5432 (internal) | PostgreSQL + pgvector for embeddings |
 
-# Skip initial sync (if vault already synced)
-python knosi-sync.py \
-  --server http://your-server:48550 \
-  --vault ~/Documents/vault \
-  --no-initial-sync
-```
+### Client Comparison
 
-### 4. Auto-start Python Client (Optional)
+| Client | Auto-start | Catches | Sync Strategy |
+|--------|------------|---------|---------------|
+| **Obsidian Plugin** | Built-in | Obsidian edits only | Queue-based (batched) |
+| **Filesystem Watcher** | macOS/Windows scripts | All filesystem changes | Immediate (debounced) |
 
-#### macOS
+**Recommendation:**
+- Use **Obsidian Plugin** for Obsidian-only workflows (simpler setup)
+- Use **Filesystem Watcher** for multi-editor workflows or external file changes
 
-```bash
-cd client/autostart
-chmod +x setup-mac.sh
-./setup-mac.sh
-```
-
-#### Windows (PowerShell)
-
-```powershell
-cd client\autostart
-
-# With admin (uses Task Scheduler):
-.\setup-windows.ps1
-
-# Without admin (uses Startup folder):
-.\setup-windows.ps1 -UseStartupFolder
-```
-
-See `client/autostart/README.md` for manual control commands.
+---
 
 ## Configuration
 
@@ -167,64 +131,26 @@ See `client/autostart/README.md` for manual control commands.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | Yes | - | Claude API key |
-| `POSTGRES_PASSWORD` | Yes | - | PostgreSQL password |
-| `API_SECRET_KEY` | No | `change-me-in-production` | Client auth key (disabled if unchanged) |
-| `MAX_FILE_SIZE_MB` | No | `100` | Max upload size |
-| `CHUNK_SIZE` | No | `4000` | Characters per chunk |
-| `CHUNK_OVERLAP` | No | `200` | Overlap between chunks |
-| `EMBEDDING_MODEL` | No | `all-MiniLM-L6-v2` | Sentence-transformers model for embeddings |
+| `ANTHROPIC_API_KEY` | Yes | - | Claude API key for PDF parsing and chat |
+| `POSTGRES_PASSWORD` | Yes | - | PostgreSQL database password |
+| `API_SECRET_KEY` | No | `change-me-in-production` | Client authentication key |
+| `MAX_FILE_SIZE_MB` | No | `100` | Maximum upload size in MB |
+| `EMBEDDING_MODEL` | No | `all-MiniLM-L6-v2` | Sentence-transformers model |
 | `EMBEDDING_DIM` | No | `384` | Embedding dimension (must match model) |
+
+See **[Server Deployment Guide](DEPLOYMENT.md)** for full configuration details.
 
 ### Embedding Models
 
-Knosi uses sentence-transformers for generating embeddings. You can choose different models based on your needs:
+| Model | Dimensions | Accuracy | Best For |
+|-------|------------|----------|----------|
+| `all-MiniLM-L6-v2` (default) | 384 | 78.1% | General use, fast |
+| `BAAI/bge-base-en-v1.5` | 768 | 84.7% | High-quality retrieval |
+| `all-mpnet-base-v2` | 768 | Higher | Best quality, slower |
 
-| Model | Dimensions | Accuracy | Speed | Best For |
-|-------|------------|----------|-------|----------|
-| `all-MiniLM-L6-v2` (default) | 384 | 78.1% | Fast | General use, limited resources |
-| `BAAI/bge-base-en-v1.5` | 768 | 84.7% | Medium | High-quality English retrieval |
-| `intfloat/e5-base-v2` | 768 | 83.5% | Medium | Balanced performance |
-| `all-mpnet-base-v2` | 768 | Higher | Slower | Best quality |
-| `nomic-ai/nomic-embed-text-v1` | 768 | 86.2% | Slower | Multilingual, large-scale |
+⚠️ **IMPORTANT:** Changing embedding models requires clearing the database and re-indexing documents. See [Server Deployment Guide](DEPLOYMENT.md) for details.
 
-**⚠️ IMPORTANT: Changing Embedding Models**
-
-Different models produce embeddings of different dimensions. **You must clear the database when switching models:**
-
-```bash
-# Stop containers
-docker compose down
-
-# Clear PostgreSQL data
-# If using POSTGRES_DATA_PATH in .env:
-sudo rm -rf /path/to/your/pgdata/*
-
-# If using Docker volume (default):
-docker volume rm knosi_pgdata
-
-# Update .env with new model and dimension
-nano .env
-# EMBEDDING_MODEL=BAAI/bge-base-en-v1.5
-# EMBEDDING_DIM=768
-
-# Rebuild and restart
-docker compose up -d --build
-
-# Re-index all your documents through the web UI
-```
-
-**Recommended model for theological/scholarly documents:** `BAAI/bge-base-en-v1.5` (768 dims) - significantly better accuracy for complex content.
-
-### Client Options
-
-| Flag | Required | Default | Description |
-|------|----------|---------|-------------|
-| `--server, -s` | Yes | - | API Server URL (port 48550) |
-| `--vault, -v` | Yes | - | Local vault path |
-| `--api-key, -k` | No | `$KNOSI_API_KEY` | API key |
-| `--no-initial-sync` | No | `false` | Skip initial sync |
-| `--debounce` | No | `2.0` | Debounce delay (seconds) |
+---
 
 ## API Endpoints
 
@@ -232,34 +158,30 @@ Base URL: `http://your-server:48550`
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/status` | GET | Server status and stats |
+| `/api/status` | GET | Server status and document count |
 | `/api/documents` | GET | List indexed documents |
 | `/api/upload` | POST | Upload and index a file |
-| `/api/documents/{filename}` | DELETE | Remove from index |
-| `/api/chat` | POST | Chat with documents |
-| `/api/search?q=...` | GET | Search documents |
+| `/api/documents/{filename}` | DELETE | Remove document from index |
+| `/api/chat` | POST | Chat with documents (RAG) |
+| `/api/search?q=...` | GET | Semantic search |
 
-## Supported File Types
-
-- PDF (parsed via Claude API)
-- Markdown (.md)
-- Plain text (.txt)
-- Org-mode (.org)
-- reStructuredText (.rst)
-- HTML (.html, .htm)
-- Word documents (.docx)
+---
 
 ## Backups
 
-PostgreSQL data is stored in a Docker volume. To backup:
+PostgreSQL data is stored in a Docker volume or block storage. To backup:
 
 ```bash
-# Backup
-docker exec knosi-db pg_dump -U knosi knosi > backup.sql
+# Backup database
+docker exec knosi-db pg_dump -U knosi knosi > backup-$(date +%Y%m%d).sql
 
-# Restore
+# Restore database
 cat backup.sql | docker exec -i knosi-db psql -U knosi knosi
 ```
+
+For block storage backups, see [Server Deployment Guide](DEPLOYMENT.md).
+
+---
 
 ## Development
 
@@ -281,25 +203,78 @@ uvicorn main:app --reload --port 48550
 # Run web locally (with hot reload)
 cd ../web
 npm install
-npm run dev  # Runs on http://localhost:3000, proxies API to :48550
+npm run dev  # Runs on http://localhost:3000
 ```
+
+### Building Obsidian Plugin
+
+```bash
+cd client/obsidian-plugin
+npm install
+npm run build  # Output: main.js
+```
+
+---
 
 ## Troubleshooting
 
-**"Connection failed - is server running?"**
-- Check if API is accessible: `curl http://your-server:48550/api/status`
-- Check firewall allows ports 48080 and 48550
+### Server Issues
+
+**"Cannot connect to server"**
+```bash
+# Check if API is accessible
+curl http://your-server:48550/api/status
+
+# Check logs
+cd ~/knosi/server
+docker compose logs -f api
+```
 
 **"Auth failed: Check API key"**
-- Ensure `--api-key` matches server's `API_SECRET_KEY`
+- Ensure client's API key matches server's `API_SECRET_KEY` in `.env`
 
-**Large PDFs timing out**
-- Increase client timeout (edit knosi-sync.py)
-- Check server logs: `docker compose logs api`
+### Client Issues
 
-**Embeddings slow on first run**
-- Model downloads on first container build (~90MB)
-- Subsequent starts are fast (model cached in image)
+**Obsidian Plugin:**
+- See [Obsidian Deployment Guide](client/obsidian-plugin/DEPLOYMENT.md#troubleshooting)
+
+**Filesystem Watcher:**
+- See [Watcher Deployment Guide](client/FILESYSTEM_WATCHER.md#troubleshooting)
+
+---
+
+## Security Checklist
+
+- ✅ Changed default `POSTGRES_PASSWORD`
+- ✅ Changed default `API_SECRET_KEY`
+- ✅ Firewall configured (ports 48080, 48550)
+- ✅ HTTPS enabled (if public-facing)
+- ✅ Regular backups configured
+- ✅ Keep system updated: `sudo apt update && sudo apt upgrade`
+
+---
+
+## Contributing
+
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Submit a pull request
+
+---
+
+## License
+
+MIT License - See [LICENSE](LICENSE) file for details.
+
+---
+
+## Links
+
+- 🌐 Website: [knosi.ai](https://knosi.ai)
+- 📦 GitHub: [github.com/a11smiles/knosi](https://github.com/a11smiles/knosi)
+- 📖 Documentation: See `docs/` folder
+- 🐛 Issues: [github.com/a11smiles/knosi/issues](https://github.com/a11smiles/knosi/issues)
 
 ---
 
