@@ -138,80 +138,37 @@
 
     <!-- Why Knosi -->
     <section class="py-24 px-6 lg:px-8 bg-white">
-        <div class="max-w-5xl mx-auto">
-            <div class="text-center mb-16">
+        <div class="max-w-4xl mx-auto">
+            <div class="text-center mb-12">
                 <h2 class="text-5xl font-bold mb-6">
                     Why <span class="gradient-text">Knosi?</span>
                 </h2>
-                <p class="text-xl text-gray-600 mb-12">Existing knowledge base solutions fall short</p>
             </div>
 
-            <div class="grid md:grid-cols-3 gap-8 mb-16">
-                <!-- Problem 1 -->
-                <div class="bg-red-50 border-2 border-red-200 rounded-2xl p-6">
-                    <div class="text-3xl mb-3">❌</div>
-                    <h3 class="text-xl font-bold mb-2 text-gray-800">Claude Projects</h3>
-                    <p class="text-gray-600">No API for automation, manual uploads only, 10MB file size limit</p>
-                </div>
+            <div class="prose prose-lg max-w-none">
+                <p class="text-xl text-gray-700 leading-relaxed mb-6">
+                    I needed to index large theological PDFs for my ministry work at Discipled Church. These weren't ordinary documents—they were comprehensive commentaries, research papers, and reference materials, often 50-100MB each with complex formatting and sometimes locked for copyright protection.
+                </p>
 
-                <!-- Problem 2 -->
-                <div class="bg-red-50 border-2 border-red-200 rounded-2xl p-6">
-                    <div class="text-3xl mb-3">❌</div>
-                    <h3 class="text-xl font-bold mb-2 text-gray-800">Khoj</h3>
-                    <p class="text-gray-600">10MB file size limit, complex authentication requirements</p>
-                </div>
+                <p class="text-xl text-gray-700 leading-relaxed mb-6">
+                    I tried <strong>Claude Projects</strong>, but it had a 10MB file size limit and no API for automation. Every document had to be uploaded manually through the web interface. For someone managing hundreds of theological texts, this was a non-starter.
+                </p>
 
-                <!-- Problem 3 -->
-                <div class="bg-red-50 border-2 border-red-200 rounded-2xl p-6">
-                    <div class="text-3xl mb-3">❌</div>
-                    <h3 class="text-xl font-bold mb-2 text-gray-800">Commercial Tools</h3>
-                    <p class="text-gray-600">Your data on their servers, expensive, vendor lock-in</p>
-                </div>
-            </div>
+                <p class="text-xl text-gray-700 leading-relaxed mb-6">
+                    Then I tried <strong>Khoj</strong>. Same 10MB limit. Even worse, its authentication system was overly complex for what I needed—a simple, reliable tool that just worked.
+                </p>
 
-            <div class="bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-200 rounded-3xl p-10">
-                <h3 class="text-3xl font-bold mb-6 text-center">
-                    <span class="gradient-text">Knosi Solves These Problems</span>
-                </h3>
-                <div class="grid md:grid-cols-2 gap-6">
-                    <div class="flex gap-3">
-                        <div class="text-2xl flex-shrink-0">✅</div>
-                        <div>
-                            <h4 class="font-bold text-gray-800 mb-1">No File Size Limits</h4>
-                            <p class="text-gray-600">Index large theological PDFs, technical manuals, research papers (default 100MB, configurable)</p>
-                        </div>
-                    </div>
-                    <div class="flex gap-3">
-                        <div class="text-2xl flex-shrink-0">✅</div>
-                        <div>
-                            <h4 class="font-bold text-gray-800 mb-1">Full Automation</h4>
-                            <p class="text-gray-600">API-first design with Obsidian plugin and filesystem watcher</p>
-                        </div>
-                    </div>
-                    <div class="flex gap-3">
-                        <div class="text-2xl flex-shrink-0">✅</div>
-                        <div>
-                            <h4 class="font-bold text-gray-800 mb-1">Complete Control</h4>
-                            <p class="text-gray-600">Self-hosted, your data never leaves your infrastructure</p>
-                        </div>
-                    </div>
-                    <div class="flex gap-3">
-                        <div class="text-2xl flex-shrink-0">✅</div>
-                        <div>
-                            <h4 class="font-bold text-gray-800 mb-1">Simple & Reliable</h4>
-                            <p class="text-gray-600">~500 lines of Python, Docker deployment, PostgreSQL + pgvector</p>
-                        </div>
-                    </div>
-                    <div class="flex gap-3 md:col-span-2">
-                        <div class="text-2xl flex-shrink-0">✅</div>
-                        <div>
-                            <h4 class="font-bold text-gray-800 mb-1">Claude-Powered PDF Parsing</h4>
-                            <p class="text-gray-600">Handles locked/protected PDFs that other tools can't read</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="mt-8 pt-8 border-t border-purple-200 text-center">
-                    <p class="text-gray-600 italic">Built by Joshua for indexing large theological documents for ministry work at Discipled Church</p>
+                <p class="text-xl text-gray-700 leading-relaxed mb-6">
+                    Commercial solutions? They wanted my theological library on their servers, charged per document or per query, and locked me into their ecosystem. My ministry's research materials deserved better.
+                </p>
+
+                <p class="text-xl text-gray-700 leading-relaxed mb-8">
+                    So I built Knosi. A self-hosted platform with no file size limits, full API access for automation, and Claude's powerful PDF parsing that could handle even locked documents. Simple Python backend, Docker deployment, PostgreSQL with pgvector for embeddings. Just ~500 lines of code doing exactly what I needed—nothing more, nothing less.
+                </p>
+
+                <div class="bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-200 rounded-2xl p-8 text-center">
+                    <p class="text-2xl font-bold text-gray-800 mb-3">Built for ministry. Shared with everyone.</p>
+                    <p class="text-lg text-gray-600">If you're frustrated with file size limits, vendor lock-in, or tools that can't handle your documents, Knosi might be what you need too.</p>
                 </div>
             </div>
         </div>
