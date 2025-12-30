@@ -17,10 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    defaults:
-      run:
-        shell: bash
-        working-directory: client/obsidian
 
     steps:
       - name: Checkout repository
@@ -32,9 +28,11 @@ jobs:
           node-version: 'lts/*'
 
       - name: Install dependencies
+        working-directory: client/obsidian
         run: yarn install
 
       - name: Build plugin
+        working-directory: client/obsidian
         run: yarn build
 
       - name: Create release
