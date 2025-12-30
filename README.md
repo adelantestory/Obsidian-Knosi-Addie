@@ -173,6 +173,48 @@ See `client/autostart/README.md` for manual control commands.
 | `MAX_FILE_SIZE_MB` | No | `100` | Max upload size |
 | `CHUNK_SIZE` | No | `4000` | Characters per chunk |
 | `CHUNK_OVERLAP` | No | `200` | Overlap between chunks |
+| `EMBEDDING_MODEL` | No | `all-MiniLM-L6-v2` | Sentence-transformers model for embeddings |
+| `EMBEDDING_DIM` | No | `384` | Embedding dimension (must match model) |
+
+### Embedding Models
+
+Knosi uses sentence-transformers for generating embeddings. You can choose different models based on your needs:
+
+| Model | Dimensions | Accuracy | Speed | Best For |
+|-------|------------|----------|-------|----------|
+| `all-MiniLM-L6-v2` (default) | 384 | 78.1% | Fast | General use, limited resources |
+| `BAAI/bge-base-en-v1.5` | 768 | 84.7% | Medium | High-quality English retrieval |
+| `intfloat/e5-base-v2` | 768 | 83.5% | Medium | Balanced performance |
+| `all-mpnet-base-v2` | 768 | Higher | Slower | Best quality |
+| `nomic-ai/nomic-embed-text-v1` | 768 | 86.2% | Slower | Multilingual, large-scale |
+
+**⚠️ IMPORTANT: Changing Embedding Models**
+
+Different models produce embeddings of different dimensions. **You must clear the database when switching models:**
+
+```bash
+# Stop containers
+docker compose down
+
+# Clear PostgreSQL data
+# If using POSTGRES_DATA_PATH in .env:
+sudo rm -rf /path/to/your/pgdata/*
+
+# If using Docker volume (default):
+docker volume rm knosi_pgdata
+
+# Update .env with new model and dimension
+nano .env
+# EMBEDDING_MODEL=BAAI/bge-base-en-v1.5
+# EMBEDDING_DIM=768
+
+# Rebuild and restart
+docker compose up -d --build
+
+# Re-index all your documents through the web UI
+```
+
+**Recommended model for theological/scholarly documents:** `BAAI/bge-base-en-v1.5` (768 dims) - significantly better accuracy for complex content.
 
 ### Client Options
 
