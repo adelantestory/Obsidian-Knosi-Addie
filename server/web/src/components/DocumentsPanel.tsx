@@ -38,7 +38,7 @@ export default function DocumentsPanel({ onDocumentsChanged }: Props) {
       setUploadProgress(`Uploading ${file.name}...`);
       setUploadStatus(null);
       try {
-        const result = await api.uploadFile(file, undefined, (status: string) => {
+        await api.uploadFile(file, undefined, (status: string) => {
           // Handle progress updates from SSE
           if (status.startsWith('complete:')) {
             const message = status.substring(9); // Remove "complete:" prefix
