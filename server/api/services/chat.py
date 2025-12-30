@@ -1,6 +1,8 @@
 """
 RAG chat service using Claude and pgvector search
 """
+import asyncio
+from functools import partial
 from typing import List, Dict, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +10,7 @@ from fastapi import HTTPException
 from models.document import Chunk
 from services.embeddings import get_embeddings
 from services.extraction import claude_client
+from utils.logging import log
 
 
 async def search_similar_chunks(
@@ -84,20 +87,32 @@ async def chat_with_documents(
 Use the context to answer the user's question. If the answer isn't in the context, say so.
 Be concise but thorough. Cite sources when relevant by mentioning the filename."""
 
-    api_message = claude_client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=4096,
-        system=system_prompt,
-        messages=[{
-            "role": "user",
-            "content": f"Context from your documents:\n\n{context}\n\n---\n\nQuestion: {message}"
-        }]
-    )
+    try:
+        # Run the blocking Claude API call in a thread pool to avoid blocking event loop
+        loop = asyncio.get_event_loop()
+        api_message = await loop.run_in_executor(
+            None,
+            partial(
+                claude_client.messages.create,
+                model="claude-sonnet-4-20250514",
+                max_tokens=4096,
+                system=system_prompt,
+                messages=[{
+                    "role": "user",
+                    "content": f"Context from your documents:\n\n{context}\n\n---\n\nQuestion: {message}"
+                }]
+            )
+        )
 
-    return {
-        "response": api_message.content[0].text,
-        "sources": sources if include_sources else []
-    }
+        return {
+            "response": api_message.content[0].text,
+            "sources": sources if include_sources else []
+        }
+    except Exception as e:
+        log(f"❌ Chat error: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
 
 
 async def search_documents(
