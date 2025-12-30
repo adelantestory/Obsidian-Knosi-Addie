@@ -35,7 +35,7 @@ cd ../..
 
 # Copy required files to root
 echo "📋 Copying plugin files to root..."
-cp client/obsidian-plugin/.gitignore ./.gitignore.plugin
+#cp client/obsidian-plugin/.gitignore ./.gitignore.plugin
 cp client/obsidian-plugin/main.js ./main.js
 cp client/obsidian-plugin/styles.css ./styles.css
 cp client/obsidian-plugin/manifest.json ./manifest.json
@@ -45,13 +45,13 @@ cp client/obsidian-plugin/README.md ./README.plugin.md
 # Remove all other files except the copied ones and .git
 echo "🗑️  Removing non-plugin files..."
 # Get list of all files except .git, the copied files, and this script
-find . -maxdepth 1 -type f ! -name '.gitignore.plugin' ! -name 'main.js' ! -name 'styles.css' ! -name 'manifest.json' ! -name 'versions.json' ! -name 'README.plugin.md' -delete
+find . -maxdepth 1 -type f ! -name 'main.js' ! -name 'styles.css' ! -name 'manifest.json' ! -name 'versions.json' ! -name 'README.plugin.md' -delete
 
 # Remove all directories except .git
 find . -maxdepth 1 -type d ! -name '.' ! -name '.git' ! -path './.git' -exec rm -rf {} +
 
 # Rename files to final names
-mv .gitignore.plugin .gitignore
+# mv .gitignore.plugin .gitignore
 mv README.plugin.md README.md
 
 # Stage all changes
