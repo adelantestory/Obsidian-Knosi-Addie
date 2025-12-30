@@ -77,29 +77,37 @@ async def extract_text_from_pdf_batch(content: bytes, filename: str, page_start:
         log(f"   DEBUG: PDF batch size: {len(base64_pdf)} base64 chars, ~{len(batch_pdf)} bytes")
 
         import time
+        import asyncio
+        from functools import partial
         start_time = time.time()
 
-        message = claude_client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=16000,
-            timeout=300.0,  # 5 minute timeout per batch
-            messages=[{
-                "role": "user",
-                "content": [
-                    {
-                        "type": "document",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "application/pdf",
-                            "data": base64_pdf,
+        # Run the blocking Claude API call in a thread pool to avoid blocking event loop
+        loop = asyncio.get_event_loop()
+        message = await loop.run_in_executor(
+            None,  # Use default thread pool
+            partial(
+                claude_client.messages.create,
+                model="claude-sonnet-4-20250514",
+                max_tokens=16000,
+                timeout=300.0,  # 5 minute timeout per batch
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "document",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "application/pdf",
+                                "data": base64_pdf,
+                            },
                         },
-                    },
-                    {
-                        "type": "text",
-                        "text": "Extract all text content from this PDF document. Preserve the structure including headings, paragraphs, and lists. Output only the extracted text, no commentary."
-                    }
-                ],
-            }],
+                        {
+                            "type": "text",
+                            "text": "Extract all text content from this PDF document. Preserve the structure including headings, paragraphs, and lists. Output only the extracted text, no commentary."
+                        }
+                    ],
+                }]
+            )
         )
 
         elapsed = time.time() - start_time
@@ -206,26 +214,35 @@ async def extract_text_from_pdf(content: bytes, filename: str, upload_id: Option
             log(f"⚙️  Processing all {total_pages} pages in single request...")
             base64_pdf = base64.standard_b64encode(content).decode("utf-8")
 
-            message = claude_client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=16000,
-                messages=[{
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "document",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "application/pdf",
-                                "data": base64_pdf,
+            import asyncio
+            from functools import partial
+
+            # Run the blocking Claude API call in a thread pool to avoid blocking event loop
+            loop = asyncio.get_event_loop()
+            message = await loop.run_in_executor(
+                None,  # Use default thread pool
+                partial(
+                    claude_client.messages.create,
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=16000,
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "document",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": "application/pdf",
+                                    "data": base64_pdf,
+                                },
                             },
-                        },
-                        {
-                            "type": "text",
-                            "text": "Extract all text content from this PDF document. Preserve the structure including headings, paragraphs, and lists. Output only the extracted text, no commentary."
-                        }
-                    ],
-                }],
+                            {
+                                "type": "text",
+                                "text": "Extract all text content from this PDF document. Preserve the structure including headings, paragraphs, and lists. Output only the extracted text, no commentary."
+                            }
+                        ],
+                    }]
+                )
             )
 
             usage = message.usage
