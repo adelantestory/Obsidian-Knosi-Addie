@@ -14,6 +14,11 @@ RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTr
 
 # Copy application
 COPY main.py /app/
+COPY core/ /app/core/
+COPY models/ /app/models/
+COPY services/ /app/services/
+COPY utils/ /app/utils/
+COPY routes/ /app/routes/
 
 EXPOSE 8000
 
