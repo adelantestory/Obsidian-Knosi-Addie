@@ -1,0 +1,10 @@
+{
+	"id": "knosi-sync",
+	"name": "Knosi",
+	"version": "1.0.0",
+	"minAppVersion": "1.10.0",
+	"description": "Sync your vault to Knosi for AI-powered document search and chat.",
+	"author": "Knosi",
+	"authorUrl": "https://knosi.ai",
+	"isDesktopOnly": true
+}

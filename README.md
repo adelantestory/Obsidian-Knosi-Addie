@@ -1,305 +1,101 @@
-# Knosi
+# Knosi Sync - Obsidian Plugin
 
-**Your personal knowledge base, powered by AI.**
-
-Knosi is a self-hosted platform for indexing and chatting with your documents. Upload PDFs, Markdown, and other files to get AI-powered answers grounded in your content.
-
-🌐 **[knosi.ai](https://knosi.ai)**
-
----
-
-## Why Knosi?
-
-Existing knowledge base solutions fall short:
-
-- **Claude Projects** - No API for automation, manual uploads only, 10MB file size limit
-- **Khoj** - 10MB file size limit, complex auth requirements
-- **Commercial solutions** - Your data on their servers, expensive, vendor lock-in
-
-Knosi was built to solve these problems:
-
-- ✅ **No file size limits** - Index large theological PDFs, technical manuals, research papers
-- ✅ **Full automation** - API-first design with Obsidian plugin and filesystem watcher
-- ✅ **Complete control** - Self-hosted, your data never leaves your infrastructure
-- ✅ **Simple & reliable** - ~500 lines of Python, Docker deployment, PostgreSQL + pgvector
-- ✅ **Claude-powered** - Native PDF parsing handles locked/protected PDFs that other tools can't read
-
-Built by [Joshua](https://github.com/a11smiles) for indexing large theological documents for ministry work.
-
----
-
-## Quick Overview
-
-```
-┌─────────────────────────────────────┐      ┌──────────────────────────────────────────────┐
-│          LOCAL MACHINE              │      │              REMOTE SERVER (Docker)          │
-│                                     │      │                                              │
-│  ┌───────────────────────────────┐  │      │  ┌────────────────────────────────────────┐ │
-│  │  Obsidian Plugin              │  │      │  │         React Frontend (:48080)        │ │
-│  │  - or -                       │  │      │  └───────────────────┬────────────────────┘ │
-│  │  Filesystem Watcher           │  │      │                      │                      │
-│  └───────────────┬───────────────┘  │      │                      ▼                      │
-│                  │                  │ HTTP │  ┌────────────────────────────────────────┐ │
-│                  └──────────────────┼─────►│  │      FastAPI Backend (:48550)          │ │
-│                                     │      │  └───────────────────┬────────────────────┘ │
-│  ┌───────────────────────────────┐  │      │           ┌──────────┴──────────┐           │
-│  │        Your Vault             │  │      │           ▼                     ▼           │
-│  │        (Documents)            │  │      │  ┌─────────────────┐   ┌─────────────────┐  │
-│  └───────────────────────────────┘  │      │  │   PostgreSQL    │   │   Claude API    │  │
-│                                     │      │  │   + pgvector    │   │                 │  │
-└─────────────────────────────────────┘      │  └─────────────────┘   └─────────────────┘  │
-                                             └──────────────────────────────────────────────┘
-```
-
----
+Automatically sync your Obsidian vault to Knosi for AI-powered document search and chat.
 
 ## Features
 
-- 🔒 **Complete Privacy** - Self-hosted, your data never leaves your control
-- 📄 **No File Limits** - Upload PDFs of any size (default 100MB, configurable)
-- ⚡ **Powered by Claude** - State-of-the-art PDF parsing and RAG chat
-- 🔍 **Semantic Search** - Advanced vector search with pgvector
-- 🔄 **Auto-Sync** - Obsidian plugin and filesystem watcher for automatic uploads
-- ⚙️ **Fully Configurable** - Customize embedding models, chunk sizes, and more
+- **Queue-based sync**: Files are queued on change, then batch-synced at a configurable interval (saves API calls)
+- **Configurable interval**: Sync every 1-60 minutes (default: 1 minute)
+- **Sync on startup**: Optionally sync all files when Obsidian opens
+- **Manual controls**: Sync current file immediately, process queue now, or sync entire vault
+- **Status bar**: Shows sync status and queue count
+- **Configurable**: Set server URL, API key, sync interval, and file types
 
----
+## How It Works
 
-## Documentation
+```
+File modified → Added to queue → Queue processed every X minutes → Upload to server
+                     │                        │
+                     │                        └── Deduped: each file synced once
+                     └── Status bar shows: 🕐 Knosi (3) = 3 files pending
+```
 
-📚 **Deployment Guides:**
-- **[Server Deployment](DEPLOYMENT.md)** - Deploy Knosi on a VPS with Docker
-- **[Obsidian Plugin](client/obsidian-plugin/DEPLOYMENT.md)** - Sync your Obsidian vault
-- **[Filesystem Watcher](client/FILESYSTEM_WATCHER.md)** - Watch any folder for changes
+This prevents excessive API calls when Obsidian's autosave triggers multiple modifications in quick succession.
 
-📖 **Additional Documentation:**
-- [CONTEXT.md](docs/CONTEXT.md) - Why this project exists, problems it solves
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Technical design and component details
-- [DECISIONS.md](docs/DECISIONS.md) - Key decisions and their rationale
-- [CURRENT_STATE.md](docs/CURRENT_STATE.md) - What's complete, what's not, next steps
+## Installation
 
----
+### From Source
 
-## Quick Start
+1. Clone/copy this folder to your vault's `.obsidian/plugins/knosi-sync/`
+2. Install dependencies and build:
+   ```bash
+   cd .obsidian/plugins/knosi-sync
+   npm install
+   npm run build
+   ```
+3. Enable the plugin in Obsidian Settings → Community Plugins
 
-### 1. Deploy the Server
+### Manual Install (Pre-built)
 
-Follow the **[Server Deployment Guide](DEPLOYMENT.md)** to:
-- Set up Docker on your VPS
-- Configure environment variables
-- Start the Knosi services
-
-Services will be available at:
-- **Web UI**: `http://your-server:48080`
-- **API**: `http://your-server:48550`
-
-### 2. Choose a Client
-
-Pick one based on your workflow:
-
-| Client | Best For | Guide |
-|--------|----------|-------|
-| **Obsidian Plugin** | Obsidian-only workflows | [Obsidian Deployment Guide](client/obsidian-plugin/DEPLOYMENT.md) |
-| **Filesystem Watcher** | Any editor, catches all filesystem changes | [Watcher Deployment Guide](client/FILESYSTEM_WATCHER.md) |
-
-### 3. Start Syncing
-
-- **Obsidian**: Enable plugin, configure server URL, files sync automatically
-- **Watcher**: Run `python knosi-sync.py --server ... --vault ...`
-
-### 4. Chat with Your Documents
-
-Visit `http://your-server:48080` and start asking questions!
-
----
-
-## Supported File Types
-
-- 📕 PDF (parsed via Claude API - handles locked PDFs)
-- 📝 Markdown (.md)
-- 📄 Plain text (.txt)
-- 🌐 HTML (.html, .htm)
-- 📋 Org-mode (.org)
-- 📜 reStructuredText (.rst)
-- 📘 Word documents (.docx)
-
----
-
-## Architecture
-
-| Service | Port | Description |
-|---------|------|-------------|
-| **Web** | 48080 | React frontend - chat UI, document management |
-| **API** | 48550 | FastAPI backend - indexing, search, chat |
-| **DB** | 5432 (internal) | PostgreSQL + pgvector for embeddings |
-
-### Client Comparison
-
-| Client | Auto-start | Catches | Sync Strategy |
-|--------|------------|---------|---------------|
-| **Obsidian Plugin** | Built-in | Obsidian edits only | Queue-based (batched) |
-| **Filesystem Watcher** | macOS/Windows scripts | All filesystem changes | Immediate (debounced) |
-
-**Recommendation:**
-- Use **Obsidian Plugin** for Obsidian-only workflows (simpler setup)
-- Use **Filesystem Watcher** for multi-editor workflows or external file changes
-
----
+1. Create folder: `.obsidian/plugins/knosi-sync/`
+2. Copy these files into it:
+   - `main.js` (after building)
+   - `manifest.json`
+3. Enable the plugin in Obsidian Settings → Community Plugins
 
 ## Configuration
 
-### Server Environment Variables
+Open Settings → Knosi Sync:
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | Yes | - | Claude API key for PDF parsing and chat |
-| `POSTGRES_PASSWORD` | Yes | - | PostgreSQL database password |
-| `API_SECRET_KEY` | No | `change-me-in-production` | Client authentication key |
-| `MAX_FILE_SIZE_MB` | No | `100` | Maximum upload size in MB |
-| `EMBEDDING_MODEL` | No | `all-MiniLM-L6-v2` | Sentence-transformers model |
-| `EMBEDDING_DIM` | No | `384` | Embedding dimension (must match model) |
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Server URL | Your Knosi API server URL | `http://localhost:48550` |
+| API Key | Authentication key (if required) | empty |
+| Auto-sync | Queue files automatically on change | enabled |
+| Sync interval | Minutes between queue processing (1-60) | 1 |
+| Sync on startup | Sync all files when Obsidian opens | enabled |
+| Supported extensions | File types to sync | `.md, .txt, .pdf, .html, .htm, .org, .rst` |
 
-See **[Server Deployment Guide](DEPLOYMENT.md)** for full configuration details.
+## Commands
 
-### Embedding Models
+Access via Command Palette (Cmd/Ctrl + P):
 
-| Model | Dimensions | Accuracy | Speed | Best For |
-|-------|------------|----------|-------|----------|
-| `all-MiniLM-L6-v2` (default) | 384 | 78.1% | Fast | General use, limited resources |
-| `BAAI/bge-base-en-v1.5` | 768 | 84.7% | Medium | High-quality English retrieval |
-| `intfloat/e5-base-v2` | 768 | 83.5% | Medium | Balanced performance |
-| `all-mpnet-base-v2` | 768 | Higher | Slower | Best quality |
-| `nomic-ai/nomic-embed-text-v1` | 768 | 86.2% | Slower | Multilingual, large-scale |
+- **Sync current file (immediate)**: Upload the currently open file right now
+- **Process sync queue now**: Sync all pending files without waiting for interval
+- **View pending sync queue**: See which files are waiting to sync
+- **Sync all files**: Upload all supported files in vault (bypasses queue)
+- **Check server status**: Test connection to server
 
-⚠️ **IMPORTANT:** Changing embedding models requires clearing the database and re-indexing documents. See [Server Deployment Guide](DEPLOYMENT.md) for details.
+## Status Bar
 
-**Recommended model for theological/scholarly documents:** `BAAI/bge-base-en-v1.5` (768 dims)
+The status bar shows sync status:
+- 🔮 Knosi - Idle, nothing pending
+- 🕐 Knosi (3) - 3 files queued for next sync
+- 🔄 Knosi: 5 files - Syncing in progress
+- ✅ Knosi - Sync completed
+- ❌ Knosi: 2 failed - Some files failed to sync
 
----
+## Notes
 
-## API Endpoints
-
-Base URL: `http://your-server:48550`
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/status` | GET | Server status and document count |
-| `/api/documents` | GET | List indexed documents |
-| `/api/upload` | POST | Upload and index a file |
-| `/api/documents/{filename}` | DELETE | Remove document from index |
-| `/api/chat` | POST | Chat with documents (RAG) |
-| `/api/search?q=...` | GET | Semantic search |
-
----
-
-## Backups
-
-PostgreSQL data is stored in a Docker volume or block storage. To backup:
-
-```bash
-# Backup database
-docker exec knosi-db pg_dump -U knosi knosi > backup-$(date +%Y%m%d).sql
-
-# Restore database
-cat backup.sql | docker exec -i knosi-db psql -U knosi knosi
-```
-
-For block storage backups, see [Server Deployment Guide](DEPLOYMENT.md).
-
----
+- The plugin only catches changes made **through Obsidian**
+- Files added via Finder/Explorer won't trigger auto-sync
+- Use "Sync all files" after adding files externally
+- For filesystem-level watching, use the Python `knosi-sync.py` client instead
+- The server deduplicates by file hash, so re-syncing unchanged files is cheap
 
 ## Development
 
-### Running Locally
-
 ```bash
-cd server
-
-# Start database only
-docker compose up -d db
-
-# Run API locally (with hot reload)
-cd api
-pip install -r requirements.txt
-DATABASE_URL=postgresql+asyncpg://knosi:password@localhost:5432/knosi \
-ANTHROPIC_API_KEY=sk-ant-xxx \
-uvicorn main:app --reload --port 48550
-
-# Run web locally (with hot reload)
-cd ../web
+# Install dependencies
 npm install
-npm run dev  # Runs on http://localhost:3000
+
+# Build for development (with watch)
+npm run dev
+
+# Build for production
+npm run build
 ```
-
-### Building Obsidian Plugin
-
-```bash
-cd client/obsidian-plugin
-npm install
-npm run build  # Output: main.js
-```
-
----
-
-## Troubleshooting
-
-### Server Issues
-
-**"Cannot connect to server"**
-```bash
-# Check if API is accessible
-curl http://your-server:48550/api/status
-
-# Check logs
-cd ~/knosi/server
-docker compose logs -f api
-```
-
-**"Auth failed: Check API key"**
-- Ensure client's API key matches server's `API_SECRET_KEY` in `.env`
-
-### Client Issues
-
-**Obsidian Plugin:**
-- See [Obsidian Deployment Guide](client/obsidian-plugin/DEPLOYMENT.md#troubleshooting)
-
-**Filesystem Watcher:**
-- See [Watcher Deployment Guide](client/FILESYSTEM_WATCHER.md#troubleshooting)
-
----
-
-## Security Checklist
-
-- ✅ Changed default `POSTGRES_PASSWORD`
-- ✅ Changed default `API_SECRET_KEY`
-- ✅ Firewall configured (ports 48080, 48550)
-- ✅ HTTPS enabled (if public-facing)
-- ✅ Regular backups configured
-- ✅ Keep system updated: `sudo apt update && sudo apt upgrade`
-
----
-
-## Contributing
-
-Contributions are welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request
-
----
-
-## License
-
-MIT License - See [LICENSE](LICENSE) file for details.
-
----
 
 ## Links
 
-- 🌐 Website: [knosi.ai](https://knosi.ai)
-- 📦 GitHub: [github.com/a11smiles/knosi](https://github.com/a11smiles/knosi)
-- 📖 Documentation: See `docs/` folder
-- 🐛 Issues: [github.com/a11smiles/knosi/issues](https://github.com/a11smiles/knosi/issues)
-
----
-
-Built with ❤️ by [Knosi](https://knosi.ai)
+- Website: [knosi.ai](https://knosi.ai)
