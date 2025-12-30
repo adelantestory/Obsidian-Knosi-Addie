@@ -1,127 +1,50 @@
 """
 Knosi API - Knowledge base indexing and chat with Claude
 https://knosi.ai
+
+Refactored to follow SOLID principles and DRY pattern.
 """
-import os
-import hashlib
-import base64
-import re
-from datetime import datetime
+import uuid
+import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional, List
-from contextlib import asynccontextmanager
 
-# Helper function for timestamped logging
-def log(message: str):
-    """Print with timestamp"""
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}] {message}", flush=True)
-
+import anthropic
+import httpx
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header, Form, Query
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from sqlalchemy import Column, String, DateTime, Integer, Text, select, delete, func, text, LargeBinary
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base
-from pgvector.sqlalchemy import Vector
-import anthropic
-from sentence_transformers import SentenceTransformer
+from sqlalchemy import select, delete, func
+from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
-import asyncio
-import uuid
 
-# Configuration
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-API_SECRET_KEY = os.getenv("API_SECRET_KEY", "change-me-in-production")
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://knosi:knosi@localhost:5432/knosi")
-MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "100"))
-CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "4000"))
-CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
-EMBEDDING_DIM = 384  # Dimension for all-MiniLM-L6-v2
-
-# PDF processing configuration
-PDF_BATCH_SIZE = int(os.getenv("PDF_BATCH_SIZE", "20"))  # Pages per batch
-PDF_BATCHES_PER_MINUTE = int(os.getenv("PDF_BATCHES_PER_MINUTE", "60"))  # Rate limit (0 = no limit)
-# Optional: Limit number of batches for testing (useful to avoid long waits during testing)
-PDF_MAX_BATCHES = int(os.getenv("PDF_MAX_BATCHES", "0")) if os.getenv("PDF_MAX_BATCHES") else None
-
-# Supported file types
-SUPPORTED_EXTENSIONS = {".pdf", ".md", ".txt", ".org", ".rst", ".html", ".htm", ".docx"}
-
-# Progress tracking for uploads
-upload_progress = {}  # {upload_id: {"status": str, "filename": str, "queues": [asyncio.Queue]}}
-
-# Rate limiting for PDF batches
-last_batch_time = None
-
-# Database setup
-Base = declarative_base()
-
-
-class Document(Base):
-    """Document metadata table."""
-    __tablename__ = "documents"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    filename = Column(String(500), unique=True, nullable=False, index=True)
-    file_hash = Column(String(64), nullable=False)
-    file_size = Column(Integer, nullable=False)
-    file_data = Column(LargeBinary, nullable=True)  # Store original file for download
-    chunk_count = Column(Integer, nullable=False, default=0)
-    indexed_at = Column(DateTime, default=datetime.utcnow)
-
-
-class Chunk(Base):
-    """Document chunks with embeddings."""
-    __tablename__ = "chunks"
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    document_id = Column(Integer, nullable=False, index=True)
-    filename = Column(String(500), nullable=False, index=True)
-    chunk_index = Column(Integer, nullable=False)
-    content = Column(Text, nullable=False)
-    embedding = Column(Vector(EMBEDDING_DIM))
-
-
-# Global instances
-engine = None
-async_session = None
-claude_client = None
-embedding_model = None
-
-
-async def init_db():
-    """Initialize database and create tables."""
-    global engine, async_session
-    
-    engine = create_async_engine(DATABASE_URL, echo=False)
-    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    
-    async with engine.begin() as conn:
-        # Enable pgvector extension
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        await conn.run_sync(Base.metadata.create_all)
-
-
-async def get_session() -> AsyncSession:
-    """Get database session."""
-    async with async_session() as session:
-        yield session
+# Import our refactored modules
+from core import (
+    init_db, get_session, close_db, verify_api_key,
+    ANTHROPIC_API_KEY, MAX_FILE_SIZE_MB, API_SECRET_KEY, SUPPORTED_EXTENSIONS
+)
+from models import Document, Chunk
+from models.schemas import ChatRequest, ChatResponse, DocumentInfo, StatusResponse
+from services import (
+    init_claude_client, init_embedding_model,
+    extract_text, get_embeddings,
+    chat_with_documents, search_documents
+)
+from utils import (
+    log, compute_file_hash, chunk_text,
+    upload_progress, send_progress, init_upload_progress, cleanup_upload_progress
+)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
-    global claude_client, embedding_model
-    
     # Initialize database
     await init_db()
-    
+
     # Initialize Claude client with custom timeout settings
     if ANTHROPIC_API_KEY:
-        import httpx
         # Create custom HTTP client with connection timeout
         http_client = httpx.Client(
             timeout=httpx.Timeout(
@@ -131,29 +54,25 @@ async def lifespan(app: FastAPI):
                 pool=30.0      # 30s to get connection from pool
             )
         )
-        claude_client = anthropic.Anthropic(
-            api_key=ANTHROPIC_API_KEY,
-            http_client=http_client
-        )
-        print("Claude API client initialized with custom timeouts")
+        init_claude_client(ANTHROPIC_API_KEY, http_client)
     else:
-        print("WARNING: ANTHROPIC_API_KEY not set - chat and PDF parsing disabled")
-    
+        log("⚠️  WARNING: ANTHROPIC_API_KEY not set - chat and PDF parsing disabled")
+
     # Initialize embedding model
-    print(f"Loading embedding model: {EMBEDDING_MODEL}...")
-    embedding_model = SentenceTransformer(EMBEDDING_MODEL)
-    print("Embedding model loaded")
-    
-    print(f"Knosi API started - https://knosi.ai")
-    print(f"Max file size: {MAX_FILE_SIZE_MB}MB")
-    print(f"API key auth: {'enabled' if API_SECRET_KEY != 'change-me-in-production' else 'disabled'}")
-    
+    init_embedding_model()
+
+    log(f"🚀 Knosi API started - https://knosi.ai")
+    log(f"📦 Max file size: {MAX_FILE_SIZE_MB}MB")
+    log(f"🔐 API key auth: {'enabled' if API_SECRET_KEY != 'change-me-in-production' else 'disabled'}")
+
     yield
-    
-    await engine.dispose()
-    print("Knosi API shutting down")
+
+    # Cleanup
+    await close_db()
+    log("👋 Knosi API shutting down")
 
 
+# Initialize FastAPI app
 app = FastAPI(title="Knosi", lifespan=lifespan)
 
 # CORS for web UI and remote clients
@@ -166,378 +85,15 @@ app.add_middleware(
 )
 
 
-# Authentication
-async def verify_api_key(x_api_key: Optional[str] = Header(None)):
-    """Verify API key for protected endpoints."""
-    if API_SECRET_KEY == "change-me-in-production":
-        return True  # Auth disabled
-    if not x_api_key or x_api_key != API_SECRET_KEY:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
-    return True
+# ============================================================================
+# API ROUTES
+# ============================================================================
 
-
-# Progress tracking helpers
-async def send_progress(upload_id: str, status: str):
-    """Send progress update to all connected SSE clients"""
-    if upload_id in upload_progress:
-        progress_data = upload_progress[upload_id]
-        progress_data["status"] = status
-        queues = progress_data.get("queues", [])
-        log(f"Sending progress to {len(queues)} SSE client(s): {status}")
-        # Send to all queues
-        for queue in queues:
-            try:
-                await queue.put({"status": status, "filename": progress_data.get("filename", "")})
-            except Exception as e:
-                log(f"Failed to send progress to queue: {e}")
-    else:
-        log(f"WARNING: send_progress called for unknown upload_id: {upload_id}")
-
-
-async def rate_limit_batch():
-    """Rate limit PDF batch processing to avoid API rate limits"""
-    global last_batch_time
-
-    if PDF_BATCHES_PER_MINUTE <= 0:
-        return  # No rate limiting
-
-    min_interval = 60.0 / PDF_BATCHES_PER_MINUTE  # Seconds between batches
-
-    if last_batch_time is not None:
-        import time
-        elapsed = time.time() - last_batch_time
-        if elapsed < min_interval:
-            wait_time = min_interval - elapsed
-            log(f"   ⏸️  Rate limiting: waiting {wait_time:.1f}s before next batch...")
-            await asyncio.sleep(wait_time)
-
-    import time
-    last_batch_time = time.time()
-
-
-# Pydantic models
-class ChatRequest(BaseModel):
-    message: str
-    include_sources: bool = True
-
-
-class ChatResponse(BaseModel):
-    response: str
-    sources: List[dict] = []
-
-
-class DocumentInfo(BaseModel):
-    filename: str
-    file_size: int
-    chunk_count: int
-    indexed_at: str
-
-
-class StatusResponse(BaseModel):
-    status: str
-    document_count: int
-    chunk_count: int
-
-
-# Helper functions
-def compute_file_hash(content: bytes) -> str:
-    """Compute SHA-256 hash of file content."""
-    return hashlib.sha256(content).hexdigest()
-
-
-def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[str]:
-    """Split text into overlapping chunks."""
-    if not text or len(text) <= chunk_size:
-        return [text] if text else []
-    
-    chunks = []
-    start = 0
-    
-    while start < len(text):
-        end = start + chunk_size
-        
-        # Try to break at paragraph or sentence boundary
-        if end < len(text):
-            # Look for paragraph break
-            para_break = text.rfind('\n\n', start, end)
-            if para_break > start + chunk_size // 2:
-                end = para_break + 2
-            else:
-                # Look for sentence break
-                for sep in ['. ', '.\n', '? ', '!\n', '! ']:
-                    sent_break = text.rfind(sep, start, end)
-                    if sent_break > start + chunk_size // 2:
-                        end = sent_break + len(sep)
-                        break
-        
-        chunk = text[start:end].strip()
-        if chunk:
-            chunks.append(chunk)
-        
-        start = end - overlap
-        if start >= len(text):
-            break
-    
-    return chunks
-
-
-async def extract_text_from_pdf_batch(content: bytes, filename: str, page_start: int, page_end: int) -> str:
-    """Extract text from a range of PDF pages using Claude."""
-    import io
-    import warnings
-    from PyPDF2 import PdfReader, PdfWriter
-
-    # Suppress PyPDF2 warnings about PDF structure issues
-    warnings.filterwarnings('ignore', category=UserWarning, module='PyPDF2')
-
-    # Split PDF to page range
-    reader = PdfReader(io.BytesIO(content))
-    writer = PdfWriter()
-
-    for page_num in range(page_start, min(page_end, len(reader.pages))):
-        writer.add_page(reader.pages[page_num])
-
-    # Write batch to bytes
-    batch_buffer = io.BytesIO()
-    writer.write(batch_buffer)
-    batch_pdf = batch_buffer.getvalue()
-
-    base64_pdf = base64.standard_b64encode(batch_pdf).decode("utf-8")
-
-    try:
-        log(f"   ⏳ Sending pages {page_start+1}-{page_end} to Claude API...")
-        log(f"   DEBUG: PDF batch size: {len(base64_pdf)} base64 chars, ~{len(batch_pdf)} bytes")
-
-        import time
-        start_time = time.time()
-
-        message = claude_client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=16000,
-            timeout=300.0,  # 5 minute timeout per batch
-            messages=[{
-                "role": "user",
-                "content": [
-                    {
-                        "type": "document",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "application/pdf",
-                            "data": base64_pdf,
-                        },
-                    },
-                    {
-                        "type": "text",
-                        "text": "Extract all text content from this PDF document. Preserve the structure including headings, paragraphs, and lists. Output only the extracted text, no commentary."
-                    }
-                ],
-            }],
-        )
-
-        elapsed = time.time() - start_time
-        log(f"   DEBUG: API call completed in {elapsed:.1f}s")
-
-        usage = message.usage
-        log(f"   ✅ Pages {page_start+1}-{page_end}: {usage.input_tokens} input tokens, {usage.output_tokens} output tokens")
-
-        return message.content[0].text
-    except anthropic.APITimeoutError as e:
-        log(f"   ❌ Timeout on pages {page_start+1}-{page_end}: {str(e)}")
-        raise HTTPException(status_code=504, detail=f"Claude API timeout on pages {page_start+1}-{page_end}")
-    except anthropic.BadRequestError as e:
-        log(f"   DEBUG: BadRequestError: {str(e)}")
-        if "content filtering policy" in str(e):
-            raise HTTPException(
-                status_code=400,
-                detail=f"PDF content blocked by content filtering policy (pages {page_start+1}-{page_end})"
-            )
-        raise HTTPException(status_code=400, detail=f"Claude API error on pages {page_start+1}-{page_end}: {str(e)}")
-    except Exception as e:
-        log(f"   ❌ UNEXPECTED ERROR in extract_text_from_pdf_batch: {type(e).__name__}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise
-
-
-async def extract_text_from_pdf(content: bytes, filename: str, upload_id: Optional[str] = None) -> str:
-    """Extract text from PDF using Claude's vision capability with batching for large files."""
-    if not claude_client:
-        raise HTTPException(status_code=500, detail="Claude API not configured")
-
-    file_size_mb = len(content) / (1024 * 1024)
-    log(f"📄 Processing PDF: {filename} ({file_size_mb:.1f}MB)")
-
-    try:
-        import io
-        import warnings
-        import pikepdf
-        from PyPDF2 import PdfReader
-
-        # Suppress PyPDF2 warnings about PDF structure issues
-        warnings.filterwarnings('ignore', category=UserWarning, module='PyPDF2')
-
-        # First, unlock/decrypt the PDF if it's protected using pikepdf
-        log(f"🔓 Unlocking PDF (if protected)...")
-        try:
-            pdf = pikepdf.open(io.BytesIO(content))
-            unlocked_buffer = io.BytesIO()
-            pdf.save(unlocked_buffer)
-            pdf.close()
-            content = unlocked_buffer.getvalue()
-            log(f"✅ PDF unlocked successfully")
-        except Exception as e:
-            log(f"⚠️  pikepdf unlock failed (may not be encrypted): {str(e)}")
-            # Continue with original content if unlock fails
-
-        # Get page count
-        reader = PdfReader(io.BytesIO(content))
-        total_pages = len(reader.pages)
-        log(f"📚 PDF has {total_pages} pages")
-
-        # For large PDFs (>5MB) or many pages (>50), process in batches
-        if file_size_mb > 5 or total_pages > 50:
-            log(f"📑 Large PDF detected - splitting into batches of {PDF_BATCH_SIZE} pages each")
-            if PDF_BATCHES_PER_MINUTE > 0:
-                log(f"⏱️  Rate limit: {PDF_BATCHES_PER_MINUTE} batches/minute")
-
-            extracted_parts = []
-            total_batches = (total_pages + PDF_BATCH_SIZE - 1) // PDF_BATCH_SIZE
-
-            # Optional: Limit batches for testing
-            if PDF_MAX_BATCHES is not None and PDF_MAX_BATCHES > 0 and total_batches > PDF_MAX_BATCHES:
-                log(f"⚠️  Batch limit enabled: Processing {PDF_MAX_BATCHES} batches (out of {total_batches})")
-                batches_to_process = PDF_MAX_BATCHES
-            else:
-                batches_to_process = total_batches
-
-            for batch_num, batch_start in enumerate(range(0, total_pages, PDF_BATCH_SIZE), 1):
-                # Stop after configured number of batches
-                if batch_num > batches_to_process:
-                    log(f"⚠️  Stopped after {batches_to_process} batches (PDF_MAX_BATCHES limit)")
-                    break
-
-                batch_end = min(batch_start + PDF_BATCH_SIZE, total_pages)
-                log(f"⚙️  Processing batch {batch_num}/{total_batches} (pages {batch_start+1}-{batch_end})...")
-
-                # Send progress update
-                if upload_id:
-                    await send_progress(upload_id, f"Processing {filename}: Batch {batch_num}/{total_batches} (pages {batch_start+1}-{batch_end})...")
-
-                # Rate limit to avoid API limits
-                if batch_num > 1:  # Don't wait before first batch
-                    await rate_limit_batch()
-
-                batch_text = await extract_text_from_pdf_batch(content, filename, batch_start, batch_end)
-                extracted_parts.append(batch_text)
-
-            # Combine all batches
-            full_text = "\n\n".join(extracted_parts)
-            log(f"✅ Extraction complete: {len(full_text):,} characters from {total_pages} pages ({total_batches} batches)")
-            return full_text
-
-        else:
-            # Small PDF - process in one go
-            log(f"⚙️  Processing all {total_pages} pages in single request...")
-            base64_pdf = base64.standard_b64encode(content).decode("utf-8")
-
-            message = claude_client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=16000,
-                messages=[{
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "document",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "application/pdf",
-                                "data": base64_pdf,
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": "Extract all text content from this PDF document. Preserve the structure including headings, paragraphs, and lists. Output only the extracted text, no commentary."
-                        }
-                    ],
-                }],
-            )
-
-            usage = message.usage
-            print(f"   📖 {usage.input_tokens} input tokens, {usage.output_tokens} output tokens")
-
-            extracted_text = message.content[0].text
-            print(f"✅ Extracted {len(extracted_text):,} characters")
-            return extracted_text
-
-    except anthropic.BadRequestError as e:
-        if "content filtering policy" in str(e):
-            raise HTTPException(
-                status_code=400,
-                detail="PDF content was blocked by Claude's content filtering policy. This can happen with certain documents. Try a different PDF or contact support if this persists."
-            )
-        raise HTTPException(status_code=400, detail=f"Claude API error: {str(e)}")
-    except Exception as e:
-        print(f"PDF extraction error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"PDF extraction failed: {str(e)}")
-
-
-async def extract_text_from_docx(content: bytes) -> str:
-    """Extract text from DOCX file."""
-    import zipfile
-    import io
-    from xml.etree import ElementTree
-    
-    text_parts = []
-    
-    with zipfile.ZipFile(io.BytesIO(content)) as zf:
-        if 'word/document.xml' in zf.namelist():
-            xml_content = zf.read('word/document.xml')
-            tree = ElementTree.fromstring(xml_content)
-            
-            ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
-            for para in tree.findall('.//w:p', ns):
-                para_text = ''.join(node.text or '' for node in para.findall('.//w:t', ns))
-                if para_text.strip():
-                    text_parts.append(para_text)
-    
-    return '\n\n'.join(text_parts)
-
-
-async def extract_text(content: bytes, filename: str, upload_id: Optional[str] = None) -> str:
-    """Extract text from file based on extension."""
-    ext = Path(filename).suffix.lower()
-
-    if ext == '.pdf':
-        return await extract_text_from_pdf(content, filename, upload_id)
-    elif ext == '.docx':
-        return await extract_text_from_docx(content)
-    elif ext in {'.md', '.txt', '.org', '.rst', '.html', '.htm'}:
-        # Try common encodings
-        for encoding in ['utf-8', 'latin-1', 'cp1252']:
-            try:
-                return content.decode(encoding)
-            except UnicodeDecodeError:
-                continue
-        return content.decode('utf-8', errors='replace')
-    else:
-        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
-
-
-def get_embeddings(texts: List[str]) -> List[List[float]]:
-    """Generate embeddings for texts."""
-    if not texts:
-        return []
-    embeddings = embedding_model.encode(texts, show_progress_bar=False)
-    return embeddings.tolist()
-
-
-# API Endpoints
 @app.get("/api/status", response_model=StatusResponse)
 async def get_status(session: AsyncSession = Depends(get_session)):
     """Get server status and index statistics."""
     doc_count = await session.scalar(select(func.count(Document.id)))
     chunk_count = await session.scalar(select(func.count(Chunk.id)))
-
     return StatusResponse(
         status="ok",
         document_count=doc_count or 0,
@@ -548,40 +104,36 @@ async def get_status(session: AsyncSession = Depends(get_session)):
 @app.get("/api/upload/{upload_id}/progress")
 async def upload_progress_stream(
     upload_id: str,
-    api_key: Optional[str] = Query(None),
-    x_api_key: Optional[str] = Header(None)
+    api_key: Optional[str] = Query(None)
 ):
-    """Stream upload progress updates via Server-Sent Events"""
-    # Check API key from query param or header
+    """SSE endpoint for upload progress updates."""
+    # Verify API key from query param (EventSource can't send custom headers)
     if API_SECRET_KEY != "change-me-in-production":
-        provided_key = api_key or x_api_key
-        if not provided_key or provided_key != API_SECRET_KEY:
+        if not api_key or api_key != API_SECRET_KEY:
             raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
     async def event_generator():
-        # Create a queue for this client
         queue = asyncio.Queue()
 
-        # Register this queue
+        # Register this SSE client for progress updates
         if upload_id not in upload_progress:
             upload_progress[upload_id] = {"status": "waiting", "filename": "", "queues": []}
         upload_progress[upload_id]["queues"].append(queue)
 
-        log(f"SSE client connected for upload {upload_id}")
+        log(f"📡 SSE client connected for upload {upload_id}")
 
         try:
             while True:
-                # Wait for progress update with timeout for keepalive
                 try:
+                    # Wait for progress update with 30s timeout
                     data = await asyncio.wait_for(queue.get(), timeout=30.0)
 
-                    # Send the update
                     yield {
                         "event": "progress",
                         "data": f"{data['status']}"
                     }
 
-                    # If done, close the connection
+                    # Close connection if upload is complete or failed
                     if data['status'].startswith('complete:') or data['status'].startswith('error:'):
                         break
 
@@ -590,11 +142,9 @@ async def upload_progress_stream(
                     yield {"event": "ping", "data": "keepalive"}
                     continue
 
-        except Exception as e:
-            log(f"SSE error for upload {upload_id}: {e}")
         finally:
-            # Cleanup
-            log(f"SSE client disconnected for upload {upload_id}")
+            log(f"📡 SSE client disconnected for upload {upload_id}")
+            # Remove this queue from the list
             if upload_id in upload_progress:
                 try:
                     upload_progress[upload_id]["queues"].remove(queue)
@@ -614,7 +164,7 @@ async def list_documents(
         select(Document).order_by(Document.indexed_at.desc())
     )
     docs = result.scalars().all()
-    
+
     return [
         DocumentInfo(
             filename=doc.filename,
@@ -635,7 +185,7 @@ async def upload_document(
     _: bool = Depends(verify_api_key)
 ):
     """Upload and index a document."""
-    # Generate upload_id if not provided
+    # Generate upload ID if not provided (for SSE progress tracking)
     if not upload_id:
         upload_id = str(uuid.uuid4())
 
@@ -648,13 +198,7 @@ async def upload_document(
         log(f"DEBUG: Using filename={filename}")
 
         # Initialize or update progress tracking (preserve existing queues from SSE)
-        if upload_id not in upload_progress:
-            upload_progress[upload_id] = {"status": f"Uploading {filename}...", "filename": filename, "queues": []}
-        else:
-            # Update existing entry but keep the queues
-            upload_progress[upload_id]["filename"] = filename
-            upload_progress[upload_id]["status"] = f"Uploading {filename}..."
-
+        init_upload_progress(upload_id, filename)
         await send_progress(upload_id, f"Uploading {filename}...")
 
         ext = Path(filename).suffix.lower()
@@ -716,79 +260,71 @@ async def upload_document(
         embeddings = get_embeddings(chunks)
         log(f"✅ Embeddings complete")
 
-        # Remove old document if exists
+        # Delete existing document if re-indexing
         if existing_doc:
-            log(f"🔄 Updating existing document...")
+            log(f"🗑️  Removing old version of {filename}...")
             await session.execute(delete(Chunk).where(Chunk.document_id == existing_doc.id))
-            await session.delete(existing_doc)
-            await session.commit()
+            await session.execute(delete(Document).where(Document.id == existing_doc.id))
 
-        # Create new document (store original file for download)
-        await send_progress(upload_id, f"Saving {filename}...")
+        # Store document
+        await send_progress(upload_id, f"Saving to database...")
         log(f"💾 Saving to database...")
         doc = Document(
             filename=filename,
             file_hash=file_hash,
             file_size=file_size,
-            file_data=content,  # Store original file
+            file_data=content,
             chunk_count=len(chunks)
         )
         session.add(doc)
         await session.flush()
 
-        # Create chunks
-        for i, (chunk_text_content, embedding) in enumerate(zip(chunks, embeddings)):
-            chunk = Chunk(
+        # Store chunks with embeddings
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+            chunk_obj = Chunk(
                 document_id=doc.id,
                 filename=filename,
                 chunk_index=i,
-                content=chunk_text_content,
+                content=chunk,
                 embedding=embedding
             )
-            session.add(chunk)
+            session.add(chunk_obj)
 
         await session.commit()
-        log(f"✅ Upload complete: {filename} ({len(chunks)} chunks)")
 
+        log(f"✅ {filename} indexed successfully ({len(chunks)} chunks)")
         await send_progress(upload_id, f"complete:{filename} indexed successfully ({len(chunks)} chunks)")
 
         return {
             "message": "Document indexed successfully",
             "filename": filename,
             "chunks": len(chunks),
-            "status": "updated" if existing_doc else "created",
+            "status": "indexed",
             "upload_id": upload_id
         }
 
-    except HTTPException as e:
-        # Send error to progress stream if not already sent
-        if upload_id in upload_progress:
-            await send_progress(upload_id, f"error:{e.detail}")
-        # Re-raise HTTP exceptions
+    except HTTPException:
         raise
     except Exception as e:
-        log(f"FATAL ERROR in upload_document: {type(e).__name__}: {str(e)}")
-        if upload_id in upload_progress:
-            await send_progress(upload_id, f"error:Upload failed: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        log(f"❌ Upload failed: {str(e)}")
+        await send_progress(upload_id, f"error:{str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Clean up progress tracking after a delay
+        async def cleanup_later():
+            await asyncio.sleep(5)
+            cleanup_upload_progress(upload_id)
+        asyncio.create_task(cleanup_later())
 
 
 @app.get("/api/documents/{filename:path}/download")
 async def download_document(
     filename: str,
     api_key: Optional[str] = Query(None),
-    x_api_key: Optional[str] = Header(None),
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    _: bool = Depends(verify_api_key)
 ):
-    """Download the original document file."""
-    # Check API key from query param or header
-    if API_SECRET_KEY != "change-me-in-production":
-        provided_key = api_key or x_api_key
-        if not provided_key or provided_key != API_SECRET_KEY:
-            raise HTTPException(status_code=401, detail="Invalid or missing API key")
-
+    """Download original document file."""
     result = await session.execute(
         select(Document).where(Document.filename == filename)
     )
@@ -798,26 +334,27 @@ async def download_document(
         raise HTTPException(status_code=404, detail="Document not found")
 
     if not doc.file_data:
-        raise HTTPException(status_code=404, detail="Original file not available for this document")
+        raise HTTPException(status_code=404, detail="Original file not available")
 
-    # Determine content type based on file extension
+    # Determine content type from extension
     ext = Path(filename).suffix.lower()
-    content_type_map = {
+    content_types = {
         '.pdf': 'application/pdf',
         '.md': 'text/markdown',
         '.txt': 'text/plain',
-        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         '.html': 'text/html',
         '.htm': 'text/html',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.org': 'text/plain',
+        '.rst': 'text/plain'
     }
-    content_type = content_type_map.get(ext, 'application/octet-stream')
+    content_type = content_types.get(ext, 'application/octet-stream')
 
-    # Return file with appropriate headers
     return Response(
         content=doc.file_data,
         media_type=content_type,
         headers={
-            'Content-Disposition': f'attachment; filename="{Path(filename).name}"'
+            'Content-Disposition': f'attachment; filename="{filename}"'
         }
     )
 
@@ -828,7 +365,7 @@ async def delete_document(
     session: AsyncSession = Depends(get_session),
     _: bool = Depends(verify_api_key)
 ):
-    """Delete a document from the index."""
+    """Delete a document and its chunks from the index."""
     result = await session.execute(
         select(Document).where(Document.filename == filename)
     )
@@ -837,10 +374,13 @@ async def delete_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    # Delete chunks
     await session.execute(delete(Chunk).where(Chunk.document_id == doc.id))
-    await session.delete(doc)
+    # Delete document
+    await session.execute(delete(Document).where(Document.id == doc.id))
     await session.commit()
 
+    log(f"🗑️  Deleted: {filename}")
     return {"message": "Document deleted", "filename": filename}
 
 
@@ -851,94 +391,31 @@ async def chat(
     _: bool = Depends(verify_api_key)
 ):
     """Chat with your documents using RAG."""
-    if not claude_client:
-        raise HTTPException(status_code=500, detail="Claude API not configured")
-    
-    # Generate embedding for query
-    query_embedding = get_embeddings([request.message])[0]
-    
-    # Search for relevant chunks using pgvector
-    result = await session.execute(
-        select(Chunk.filename, Chunk.content, Chunk.chunk_index)
-        .order_by(Chunk.embedding.cosine_distance(query_embedding))
-        .limit(5)
+    result = await chat_with_documents(
+        request.message,
+        session,
+        request.include_sources
     )
-    chunks = result.all()
-    
-    if not chunks:
-        return ChatResponse(
-            response="No documents have been indexed yet. Upload some documents first.",
-            sources=[]
-        )
-    
-    # Build context
-    context_parts = []
-    sources = []
-    
-    for filename, content, chunk_index in chunks:
-        context_parts.append(f"[Source: {filename}]\n{content}")
-        if filename not in [s["filename"] for s in sources]:
-            sources.append({"filename": filename, "chunk_index": chunk_index})
-    
-    context = "\n\n---\n\n".join(context_parts)
-    
-    # Query Claude
-    system_prompt = """You are a helpful assistant that answers questions based on the provided document context.
-Use the context to answer the user's question. If the answer isn't in the context, say so.
-Be concise but thorough. Cite sources when relevant by mentioning the filename."""
-    
-    message = claude_client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=4096,
-        system=system_prompt,
-        messages=[{
-            "role": "user",
-            "content": f"Context from your documents:\n\n{context}\n\n---\n\nQuestion: {request.message}"
-        }]
-    )
-    
-    return ChatResponse(
-        response=message.content[0].text,
-        sources=sources if request.include_sources else []
-    )
+    return ChatResponse(**result)
 
 
 @app.get("/api/search")
-async def search_documents(
+async def search(
     q: str,
     limit: int = 10,
     session: AsyncSession = Depends(get_session),
     _: bool = Depends(verify_api_key)
 ):
     """Search documents by semantic similarity."""
-    if not q.strip():
-        raise HTTPException(status_code=400, detail="Query cannot be empty")
-    
-    query_embedding = get_embeddings([q])[0]
-    
-    result = await session.execute(
-        select(Chunk.filename, Chunk.content, Chunk.chunk_index)
-        .order_by(Chunk.embedding.cosine_distance(query_embedding))
-        .limit(limit)
-    )
-    chunks = result.all()
-    
-    return [
-        {
-            "filename": filename,
-            "content": content[:500] + "..." if len(content) > 500 else content,
-            "chunk_index": chunk_index
-        }
-        for filename, content, chunk_index in chunks
-    ]
+    return await search_documents(q, session, limit)
 
 
 @app.get("/")
 async def root():
-    """API root endpoint."""
+    """API root - redirect to documentation."""
     return {
-        "name": "Knosi API",
+        "name": "Knosi",
         "version": "1.0.0",
         "docs": "/docs",
-        "status": "/api/status"
+        "website": "https://knosi.ai"
     }
