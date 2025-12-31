@@ -38,7 +38,7 @@ export default class KnosiSyncPlugin extends Plugin {
 	// Helper for verbose logging that respects user settings
 	private log(message: string) {
 		if (this.settings?.verboseLogging) {
-			console.debug(`[Knosi] ${message}`);
+			console.warn(`[Knosi] ${message}`);
 		}
 	}
 
