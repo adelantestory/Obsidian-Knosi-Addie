@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice, TFile, TAbstractFile, requestUrl, ItemView, WorkspaceLeaf } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, Notice, TFile, TAbstractFile, requestUrl, ItemView, WorkspaceLeaf, RequestUrlParam, RequestUrlResponse } from 'obsidian';
 
 interface KnosiSettings {
 	serverUrl: string;
@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS: KnosiSettings = {
 	syncOnStartup: true,
 	syncIntervalMinutes: 10,
 	supportedExtensions: ['.md', '.txt', '.pdf', '.html', '.htm', '.org', '.rst', '.png', '.jpg', '.jpeg', '.gif', '.webp'],
-	excludePatterns: ['.obsidian/', '.trash/', 'Templates/'],
+	excludePatterns: ['.trash/', 'Templates/'],
 	verboseLogging: false
 };
 
@@ -52,25 +52,25 @@ export default class KnosiSyncPlugin extends Plugin {
 		this.addCommand({
 			id: 'sync-current-file',
 			name: 'Sync current file (immediate)',
-			callback: () => this.syncCurrentFile()
+			callback: () => void this.syncCurrentFile()
 		});
 
 		this.addCommand({
 			id: 'sync-queue-now',
 			name: 'Process sync queue now',
-			callback: () => this.processQueue()
+			callback: () => void this.processQueue()
 		});
 
 		this.addCommand({
 			id: 'sync-all-files',
 			name: 'Sync all files',
-			callback: () => this.syncAllFiles()
+			callback: () => void this.syncAllFiles()
 		});
 
 		this.addCommand({
 			id: 'check-server-status',
 			name: 'Check server status',
-			callback: () => this.checkServerStatus()
+			callback: () => void this.checkServerStatus()
 		});
 
 		this.addCommand({
@@ -82,12 +82,12 @@ export default class KnosiSyncPlugin extends Plugin {
 		this.addCommand({
 			id: 'open-chat',
 			name: 'Open chat',
-			callback: () => this.activateChatView()
+			callback: () => void this.activateChatView()
 		});
 
 		// Ribbon icon to open chat
-		this.addRibbonIcon('message-square', 'Knosi Chat', () => {
-			this.activateChatView();
+		this.addRibbonIcon('message-square', 'Knosi chat', () => {
+			void this.activateChatView();
 		});
 
 		// Settings tab
@@ -97,7 +97,7 @@ export default class KnosiSyncPlugin extends Plugin {
 		setTimeout(() => {
 			// Initial sync on startup (if enabled)
 			if (this.settings.syncOnStartup) {
-				this.syncAllFiles();
+				void this.syncAllFiles();
 			}
 
 			// Register vault events after initial sync to avoid queueing existing files
@@ -119,15 +119,12 @@ export default class KnosiSyncPlugin extends Plugin {
 				this.startSyncInterval();
 			}
 		}, 5000); // 5 second delay to let Obsidian fully load
-
-		console.log('Knosi plugin loaded');
 	}
 
 	onunload() {
 		this.stopSyncInterval();
 		this.pendingUploads.clear();
 		this.pendingDeletes.clear();
-		console.log('Knosi Sync plugin unloaded');
 	}
 
 	async loadSettings() {
@@ -169,7 +166,7 @@ export default class KnosiSyncPlugin extends Plugin {
 		}
 
 		if (this.settings.verboseLogging) {
-			console.log(`Rescanning vault for new extensions: ${addedExtensions.join(', ')}`);
+			console.debug(`Rescanning vault for new extensions: ${addedExtensions.join(', ')}`);
 		}
 		new Notice(`Rescanning vault for: ${addedExtensions.join(', ')}`);
 
@@ -187,7 +184,7 @@ export default class KnosiSyncPlugin extends Plugin {
 
 		if (queuedCount > 0) {
 			if (this.settings.verboseLogging) {
-				console.log(`Queued ${queuedCount} files for sync`);
+				console.debug(`Queued ${queuedCount} files for sync`);
 			}
 			new Notice(`Queued ${queuedCount} files for sync`);
 			this.updateStatusBar('pending');
@@ -205,7 +202,7 @@ export default class KnosiSyncPlugin extends Plugin {
 		}
 
 		if (this.settings.verboseLogging) {
-			console.log(`Rescanning vault for newly excluded patterns: ${addedPatterns.join(', ')}`);
+			console.debug(`Rescanning vault for newly excluded patterns: ${addedPatterns.join(', ')}`);
 		}
 		new Notice(`Finding files to delete for: ${addedPatterns.join(', ')}`);
 
@@ -258,7 +255,7 @@ export default class KnosiSyncPlugin extends Plugin {
 
 		if (queuedCount > 0) {
 			if (this.settings.verboseLogging) {
-				console.log(`Queued ${queuedCount} files for deletion`);
+				console.debug(`Queued ${queuedCount} files for deletion`);
 			}
 			new Notice(`Queued ${queuedCount} files for deletion from server`);
 			this.updateStatusBar('pending');
@@ -272,7 +269,7 @@ export default class KnosiSyncPlugin extends Plugin {
 		const intervalMs = this.settings.syncIntervalMinutes * 60 * 1000;
 		this.syncIntervalId = window.setInterval(() => this.processQueue(), intervalMs);
 		if (this.settings.verboseLogging) {
-			console.log(`Sync interval started: every ${this.settings.syncIntervalMinutes} minute(s)`);
+			console.debug(`Sync interval started: every ${this.settings.syncIntervalMinutes} minute(s)`);
 		}
 	}
 
@@ -351,7 +348,7 @@ export default class KnosiSyncPlugin extends Plugin {
 		// Check if file is excluded
 		if (this.isExcluded(file.path)) {
 			if (this.settings.verboseLogging) {
-				console.log(`Skipping excluded file: ${file.path}`);
+				console.debug(`Skipping excluded file: ${file.path}`);
 			}
 			return;
 		}
@@ -364,7 +361,7 @@ export default class KnosiSyncPlugin extends Plugin {
 		this.updateStatusBar('pending');
 
 		if (this.settings.verboseLogging) {
-			console.log(`Queued for sync: ${file.path} (${this.pendingUploads.size} in queue)`);
+			console.debug(`Queued for sync: ${file.path} (${this.pendingUploads.size} in queue)`);
 		}
 	}
 
@@ -381,7 +378,7 @@ export default class KnosiSyncPlugin extends Plugin {
 		this.updateStatusBar('pending');
 
 		if (this.settings.verboseLogging) {
-			console.log(`Queued for delete: ${file.path}`);
+			console.debug(`Queued for delete: ${file.path}`);
 		}
 	}
 
@@ -401,7 +398,7 @@ export default class KnosiSyncPlugin extends Plugin {
 	async processQueue() {
 		if (this.syncInProgress) {
 			if (this.settings.verboseLogging) {
-				console.log('Sync already in progress, skipping');
+				console.debug('Sync already in progress, skipping');
 			}
 			return;
 		}
@@ -418,7 +415,7 @@ export default class KnosiSyncPlugin extends Plugin {
 		this.updateStatusBar('syncing', `${uploadsToProcess.size} files`);
 
 		if (this.settings.verboseLogging) {
-			console.log(`Processing queue: ${uploadsToProcess.size} uploads, ${deletesToProcess.size} deletes`);
+			console.debug(`Processing queue: ${uploadsToProcess.size} uploads, ${deletesToProcess.size} deletes`);
 		}
 
 		let uploaded = 0;
@@ -479,7 +476,7 @@ export default class KnosiSyncPlugin extends Plugin {
 		}
 
 		if (this.settings.verboseLogging) {
-			console.log(`Queue processed: ${uploaded} uploaded, ${deleted} deleted, ${errors} errors`);
+			console.debug(`Queue processed: ${uploaded} uploaded, ${deleted} deleted, ${errors} errors`);
 		}
 	}
 
@@ -522,7 +519,7 @@ export default class KnosiSyncPlugin extends Plugin {
 			// Skip empty files
 			if (content.byteLength === 0) {
 				if (this.settings.verboseLogging) {
-					console.log(`Skipping empty file: ${file.path}`);
+					console.debug(`Skipping empty file: ${file.path}`);
 				}
 				return;
 			}
@@ -535,22 +532,24 @@ export default class KnosiSyncPlugin extends Plugin {
 			formData.append('path', file.path);
 			formData.append('vault_name', this.app.vault.getName());
 
-			const response = await fetch(`${this.settings.serverUrl}/api/upload`, {
+			const response = await requestUrl({
+				url: `${this.settings.serverUrl}/api/upload`,
 				method: 'POST',
 				headers: {
 					'X-API-Key': this.settings.apiKey
 				},
-				body: formData
+				body: formData as any,
+				throw: false
 			});
 
-			if (!response.ok) {
-				const error = await response.json();
+			if (response.status >= 400) {
+				const error = response.json;
 				throw new Error(error.detail || `HTTP ${response.status}`);
 			}
 
-			const result = await response.json();
+			const result = response.json;
 			if (this.settings.verboseLogging) {
-				console.log(`Synced: ${file.path} (${result.status})`);
+				console.debug(`Synced: ${file.path} (${result.status})`);
 			}
 
 		} catch (error) {
@@ -565,19 +564,18 @@ export default class KnosiSyncPlugin extends Plugin {
 			const url = new URL(`${this.settings.serverUrl}/api/documents/${encodeURIComponent(path)}`);
 			url.searchParams.set('vault_name', vaultName);
 
-			const response = await fetch(
-				url.toString(),
-				{
-					method: 'DELETE',
-					headers: {
-						'X-API-Key': this.settings.apiKey
-					}
-				}
-			);
+			const response = await requestUrl({
+				url: url.toString(),
+				method: 'DELETE',
+				headers: {
+					'X-API-Key': this.settings.apiKey
+				},
+				throw: false
+			});
 
-			if (response.ok) {
+			if (response.status < 400) {
 				if (this.settings.verboseLogging) {
-					console.log(`Deleted from index: ${path}`);
+					console.debug(`Deleted from index: ${path}`);
 				}
 			}
 		} catch (error) {
@@ -649,33 +647,32 @@ export default class KnosiSyncPlugin extends Plugin {
 	async activateChatView() {
 		const { workspace } = this.app;
 
-		let leaf: WorkspaceLeaf | null = null;
 		const leaves = workspace.getLeavesOfType(KNOSI_CHAT_VIEW);
 
 		if (leaves.length > 0) {
 			// Chat view already open, focus it
-			leaf = leaves[0];
+			workspace.revealLeaf(leaves[0]);
 		} else {
 			// Open chat view in right sidebar
-			leaf = workspace.getRightLeaf(false);
-			await leaf?.setViewState({ type: KNOSI_CHAT_VIEW, active: true });
-		}
-
-		// Reveal the leaf
-		if (leaf) {
-			workspace.revealLeaf(leaf);
+			const leaf = workspace.getRightLeaf(false);
+			if (leaf) {
+				await leaf.setViewState({ type: KNOSI_CHAT_VIEW, active: true });
+				workspace.revealLeaf(leaf);
+			}
 		}
 	}
 
 	async checkServerStatus() {
 		try {
-			const response = await fetch(`${this.settings.serverUrl}/api/status`, {
+			const response = await requestUrl({
+				url: `${this.settings.serverUrl}/api/status`,
 				headers: {
 					'X-API-Key': this.settings.apiKey
-				}
+				},
+				throw: false
 			});
 
-			if (!response.ok) {
+			if (response.status >= 400) {
 				if (response.status === 401) {
 					new Notice('❌ Authentication failed - check API key');
 				} else {
@@ -684,7 +681,7 @@ export default class KnosiSyncPlugin extends Plugin {
 				return;
 			}
 
-			const data = await response.json();
+			const data = response.json;
 			new Notice(`✅ Connected: ${data.document_count} documents, ${data.chunk_count} chunks`);
 
 		} catch (error) {
@@ -747,11 +744,11 @@ class KnosiChatView extends ItemView {
 		});
 
 		// Event listeners
-		this.sendButton.addEventListener('click', () => this.sendMessage());
+		this.sendButton.addEventListener('click', () => void this.sendMessage());
 		this.inputEl.addEventListener('keydown', (e) => {
 			if (e.key === 'Enter' && !e.shiftKey) {
 				e.preventDefault();
-				this.sendMessage();
+				void this.sendMessage();
 			}
 			// Shift+Enter allows newline (default textarea behavior)
 		});
@@ -840,7 +837,7 @@ class KnosiChatView extends ItemView {
 				// Add indicator if from different vault
 				const currentVaultName = this.plugin.app.vault.getName();
 				if (source.source_type === 'vault' && source.vault_name && source.vault_name !== currentVaultName) {
-					const vaultIndicator = itemEl.createEl('span', {
+					itemEl.createEl('span', {
 						text: ` (from "${source.vault_name}")`,
 						cls: 'knosi-source-vault-indicator'
 					});
@@ -923,20 +920,22 @@ class KnosiChatView extends ItemView {
 		loadingEl.createEl('div', { cls: 'knosi-chat-message-content', text: 'Thinking...' });
 
 		try {
-			const response = await fetch(`${this.plugin.settings.serverUrl}/api/chat`, {
+			const response = await requestUrl({
+				url: `${this.plugin.settings.serverUrl}/api/chat`,
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
 					'X-API-Key': this.plugin.settings.apiKey
 				},
-				body: JSON.stringify({ message })
+				body: JSON.stringify({ message }),
+				throw: false
 			});
 
-			if (!response.ok) {
+			if (response.status >= 400) {
 				throw new Error(`HTTP ${response.status}`);
 			}
 
-			const data = await response.json();
+			const data = response.json;
 
 			// Remove loading indicator
 			loadingEl.remove();
@@ -970,7 +969,9 @@ class KnosiSettingTab extends PluginSettingTab {
 		this.originalSettings = JSON.parse(JSON.stringify(this.plugin.settings));
 		this.tempSettings = JSON.parse(JSON.stringify(this.plugin.settings));
 
-		containerEl.createEl('h1', { text: 'Knosi' });
+		new Setting(containerEl)
+			.setName('Knosi')
+			.setHeading();
 
 		new Setting(containerEl)
 			.setName('Server URL')
@@ -1058,7 +1059,6 @@ class KnosiSettingTab extends PluginSettingTab {
 							.filter(s => s.length > 0);
 					});
 				text.inputEl.rows = 3;
-//				text.inputEl.style.width = '100%';
 			});
 
 		new Setting(containerEl)
@@ -1079,7 +1079,10 @@ class KnosiSettingTab extends PluginSettingTab {
 					await this.saveSettings();
 				}));
 
-		containerEl.createEl('h3', { text: 'Actions' });
+
+		new Setting(containerEl)
+			.setName('Actions')
+			.setHeading();
 
 		new Setting(containerEl)
 			.setName('Test connection')
