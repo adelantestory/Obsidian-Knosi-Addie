@@ -527,7 +527,7 @@ export default class KnosiSyncPlugin extends Plugin {
 			const blob = new Blob([content], { type: 'application/octet-stream' });
 
 			// Build multipart form data manually for requestUrl
-			const randomBoundaryString = crypto.randomUUID();
+			const boundary = `----WebKitFormBoundary${crypto.randomUUID().replace(/-/g, '')}`;
 
 			// Construct text fields (path and vault_name)
 			const textData = {
@@ -537,21 +537,21 @@ export default class KnosiSyncPlugin extends Plugin {
 
 			let preString = '';
 			for (const key in textData) {
-				preString += `----${randomBoundaryString}\r\n`;
+				preString += `--${boundary}\r\n`;
 				preString += `Content-Disposition: form-data; name="${key}"\r\n\r\n`;
 				preString += `${textData[key]}\r\n`;
 			}
 
 			// Construct file part headers
 			const fileHeaders = [
-				`----${randomBoundaryString}\r\n`,
+				`--${boundary}\r\n`,
 				`Content-Disposition: form-data; name="file"; filename="${file.name}"\r\n`,
 				`Content-Type: application/octet-stream\r\n`,
 				`\r\n`
 			].join('');
 
 			// Construct final boundary
-			const postString = `\r\n----${randomBoundaryString}--\r\n`;
+			const postString = `\r\n--${boundary}--\r\n`;
 
 			// Encode strings to binary
 			const encoder = new TextEncoder();
@@ -570,7 +570,7 @@ export default class KnosiSyncPlugin extends Plugin {
 			const response = await requestUrl({
 				url: `${this.settings.serverUrl}/api/upload`,
 				method: 'POST',
-				contentType: `multipart/form-data; boundary=----${randomBoundaryString}`,
+				contentType: `multipart/form-data; boundary=${boundary}`,
 				headers: {
 					'X-API-Key': this.settings.apiKey
 				},
