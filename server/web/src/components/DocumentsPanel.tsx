@@ -100,10 +100,10 @@ export default function DocumentsPanel({ onDocumentsChanged }: Props) {
     setUploadProgress(null);
   };
 
-  const handleDelete = async (filename: string) => {
+  const handleDelete = async (filename: string, vaultName?: string) => {
     if (!confirm(`Delete "${filename}"?`)) return;
     try {
-      await api.deleteDocument(filename);
+      await api.deleteDocument(filename, vaultName);
       loadDocuments();
       onDocumentsChanged();
     } catch (err) {
@@ -251,7 +251,7 @@ export default function DocumentsPanel({ onDocumentsChanged }: Props) {
                     <Download size={18} />
                   </button>
                   <button
-                    onClick={() => handleDelete(doc.filename)}
+                    onClick={() => handleDelete(doc.filename, doc.vault_name)}
                     className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded-lg transition-colors"
                     title="Delete"
                   >

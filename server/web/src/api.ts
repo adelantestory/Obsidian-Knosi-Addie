@@ -21,6 +21,7 @@ export interface Document {
   file_size: number;
   chunk_count: number;
   indexed_at: string;
+  vault_name?: string;
 }
 
 export interface StatusResponse {
@@ -152,8 +153,12 @@ class ApiClient {
     });
   }
 
-  async deleteDocument(filename: string): Promise<void> {
-    const response = await fetch(`${API_URL}/api/documents/${encodeURIComponent(filename)}`, {
+  async deleteDocument(filename: string, vaultName?: string): Promise<void> {
+    let url = `${API_URL}/api/documents/${encodeURIComponent(filename)}`;
+    if (vaultName) {
+      url += `?vault_name=${encodeURIComponent(vaultName)}`;
+    }
+    const response = await fetch(url, {
       method: 'DELETE',
       headers: this.getHeaders(),
     });

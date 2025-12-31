@@ -1,7 +1,7 @@
 """
 Pydantic schemas for API requests and responses
 """
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 
@@ -20,6 +20,7 @@ class DocumentInfo(BaseModel):
     file_size: int
     chunk_count: int
     indexed_at: str
+    vault_name: Optional[str] = None
 
 
 class StatusResponse(BaseModel):
