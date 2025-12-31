@@ -188,7 +188,8 @@ async def list_documents(
             filename=doc.filename,
             file_size=doc.file_size,
             chunk_count=doc.chunk_count,
-            indexed_at=doc.indexed_at.isoformat()
+            indexed_at=doc.indexed_at.isoformat(),
+            vault_name=doc.vault_name
         )
         for doc in docs
     ]
