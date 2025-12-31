@@ -193,11 +193,18 @@ class ApiClient {
     return response.json();
   }
 
-  getDownloadUrl(filename: string): string {
+  getDownloadUrl(filename: string, vaultName?: string): string {
     const apiKey = this.getApiKey();
-    const url = `${API_URL}/api/documents/${encodeURIComponent(filename)}/download`;
+    let url = `${API_URL}/api/documents/${encodeURIComponent(filename)}/download`;
+    const params = new URLSearchParams();
     if (apiKey) {
-      return `${url}?api_key=${encodeURIComponent(apiKey)}`;
+      params.append('api_key', apiKey);
+    }
+    if (vaultName) {
+      params.append('vault_name', vaultName);
+    }
+    if (params.toString()) {
+      url += `?${params.toString()}`;
     }
     return url;
   }

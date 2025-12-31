@@ -114,8 +114,8 @@ export default function DocumentsPanel({ onDocumentsChanged }: Props) {
     }
   };
 
-  const handleDownload = (filename: string) => {
-    const downloadUrl = api.getDownloadUrl(filename);
+  const handleDownload = (filename: string, vaultName?: string) => {
+    const downloadUrl = api.getDownloadUrl(filename, vaultName);
     window.open(downloadUrl, '_blank');
   };
 
@@ -231,7 +231,7 @@ export default function DocumentsPanel({ onDocumentsChanged }: Props) {
                   <FileText className="w-5 h-5 text-slate-400 flex-shrink-0" />
                   <div className="min-w-0 flex-1">
                     <button
-                      onClick={() => handleDownload(doc.filename)}
+                      onClick={() => handleDownload(doc.filename, doc.vault_name)}
                       className="text-slate-200 hover:text-primary-400 truncate block text-left underline decoration-dotted underline-offset-2 transition-colors"
                       title={`Download ${doc.filename}`}
                     >
@@ -244,7 +244,7 @@ export default function DocumentsPanel({ onDocumentsChanged }: Props) {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handleDownload(doc.filename)}
+                    onClick={() => handleDownload(doc.filename, doc.vault_name)}
                     className="p-2 text-slate-400 hover:text-primary-400 hover:bg-slate-600 rounded-lg transition-colors"
                     title="Download"
                   >
