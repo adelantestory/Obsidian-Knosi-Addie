@@ -1,36 +1,49 @@
 """
-Embedding generation service using sentence-transformers
+Embedding generation service using Azure OpenAI
 """
 import asyncio
-from functools import partial
 from typing import List
-from sentence_transformers import SentenceTransformer
-from core.config import EMBEDDING_MODEL
+from openai import AzureOpenAI
+from core.config import (
+    AZURE_OPENAI_ENDPOINT,
+    AZURE_OPENAI_API_KEY,
+    AZURE_OPENAI_EMBEDDING_DEPLOYMENT,
+    AZURE_OPENAI_API_VERSION,
+)
 from utils.logging import log
 
-# Global embedding model instance
-embedding_model = None
+# Global Azure OpenAI client
+client = None
 
 
 def init_embedding_model():
-    """Initialize sentence transformer model."""
-    global embedding_model
-    log(f"🧠 Loading embedding model: {EMBEDDING_MODEL}...")
-    embedding_model = SentenceTransformer(EMBEDDING_MODEL)
-    log(f"✅ Embedding model loaded")
+    """Initialize Azure OpenAI client."""
+    global client
+    log(f"🧠 Initializing Azure OpenAI embeddings client...")
+    client = AzureOpenAI(
+        azure_endpoint=AZURE_OPENAI_ENDPOINT,
+        api_key=AZURE_OPENAI_API_KEY,
+        api_version=AZURE_OPENAI_API_VERSION,
+    )
+    log(f"✅ Azure OpenAI client initialized")
 
 
-def _encode_sync(texts: List[str]) -> List[List[float]]:
-    """Synchronous encoding function to run in thread pool."""
-    embeddings = embedding_model.encode(texts, show_progress_bar=False)
-    return embeddings.tolist()
+def _get_embeddings_sync(texts: List[str]) -> List[List[float]]:
+    """Synchronous embedding function to run in thread pool."""
+    # Azure OpenAI supports batching - send all texts at once
+    response = client.embeddings.create(
+        input=texts,
+        model=AZURE_OPENAI_EMBEDDING_DEPLOYMENT,
+    )
+    # Extract embeddings in order
+    return [item.embedding for item in response.data]
 
 
 async def get_embeddings(texts: List[str]) -> List[List[float]]:
     """
-    Generate embeddings for a list of texts.
+    Generate embeddings for a list of texts using Azure OpenAI.
 
-    Runs the CPU-intensive encoding in a thread pool to avoid blocking the event loop.
+    Runs the API call in a thread pool to avoid blocking the event loop.
 
     Args:
         texts: List of text strings to embed
@@ -41,10 +54,11 @@ async def get_embeddings(texts: List[str]) -> List[List[float]]:
     if not texts:
         return []
 
-    if not embedding_model:
-        raise RuntimeError("Embedding model not initialized")
+    if not client:
+        raise RuntimeError("Azure OpenAI client not initialized")
 
-    # Run the blocking encode operation in a thread pool
+    # Run the blocking API call in a thread pool
     loop = asyncio.get_event_loop()
-    embeddings = await loop.run_in_executor(None, _encode_sync, texts)
+    embeddings = await loop.run_in_executor(None, _get_embeddings_sync, texts)
     return embeddings
+

@@ -21,8 +21,11 @@ SUPPORTED_EXTENSIONS = {
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "4000"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
 
-# Embedding Configuration
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+# Azure OpenAI Embedding Configuration
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT")
+AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01")
 
 # Embedding dimension - must match the model's output dimension
 # Common dimensions:
@@ -33,7 +36,7 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 # - nomic-ai/nomic-embed-text-v1: 768
 # WARNING: Changing this after indexing documents will cause dimension mismatches!
 # You must clear the database when switching embedding models.
-EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIM", "384"))
+EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIM", "1536"))
 
 # PDF Processing Configuration
 PDF_BATCH_SIZE = int(os.getenv("PDF_BATCH_SIZE", "20"))  # Pages per batch
